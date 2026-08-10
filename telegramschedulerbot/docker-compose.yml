@@ -1,9 +1,0 @@
-services:
-  bot:
-    build: .
-    env_file: .env
-    volumes:
-      - ./data:/app/data
-    ports:
-      - "8000:8000"
-    restart: unless-stopped
