@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Домашние задания — Планировщик{% endblock %}
+{% block content %}
+  <h1>Домашние задания</h1>
+
+  <section class="card">
+    <table class="table">
+      <thead>
+        <tr><th>Срок</th><th>Предмет</th><th>Задание</th><th>Готово</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for h in items %}
+          <tr class="{{ 'done' if h.done else '' }}">
+            <td>{{ h.due_date.strftime('%d.%m.%Y') }}{% if h.due_time %} {{ h.due_time.strftime('%H:%M') }}{% endif %}</td>
+            <td>{{ h.subject }}</td>
+            <td>{{ h.description }}</td>
+            <td>{{ 'да' if h.done else 'нет' }}</td>
+            <td class="actions">
+              <form method="post" action="/homework/{{ h.id }}/toggle_done">
+                <button type="submit">{{ 'Вернуть' if h.done else 'Готово' }}</button>
+              </form>
+              <form method="post" action="/homework/{{ h.id }}/delete" onsubmit="return confirm('Удалить задание?');">
+                <button type="submit" class="danger">Удалить</button>
+              </form>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="5" class="muted">Заданий пока нет.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="card">
+    <h2>Добавить задание</h2>
+    <form method="post" action="/homework/add" class="form-grid">
+      <label>Предмет <input type="text" name="subject" required></label>
+      <label>Срок сдачи <input type="date" name="due_date" required></label>
+      <label>Время (необязательно) <input type="time" name="due_time"></label>
+      <label class="full">Описание <textarea name="description" required></textarea></label>
+      <button type="submit">Добавить</button>
+    </form>
+  </section>
+{% endblock %}
