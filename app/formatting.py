@@ -15,6 +15,8 @@ def format_lessons(lessons: Iterable[Lesson]) -> str:
         line = f"{t} — {lesson.subject}"
         if lesson.room:
             line += f" (каб. {lesson.room})"
+        if lesson.link:
+            line += f"\n🔗 {lesson.link}"
         lines.append(line)
     return "\n".join(lines)
 

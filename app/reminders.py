@@ -84,6 +84,8 @@ async def tick(bot: Bot) -> None:
                     text = f"⏰ Через {settings_row.lesson_reminder_minutes} мин: {lesson.subject}"
                     if lesson.room:
                         text += f" (каб. {lesson.room})"
+                    if lesson.link:
+                        text += f"\n🔗 {lesson.link}"
                     await bot.send_message(student.telegram_chat_id, text)
                     await _log_sent(session, "lesson", lesson.id, today)
 

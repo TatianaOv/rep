@@ -109,6 +109,7 @@ def create_app() -> FastAPI:
         subject: str = Form(...),
         room: str = Form(""),
         teacher: str = Form(""),
+        link: str = Form(""),
     ):
         redirect = redirect_if_unauthed(request)
         if redirect:
@@ -121,9 +122,51 @@ def create_app() -> FastAPI:
                 subject=subject.strip(),
                 room=room.strip() or None,
                 teacher=teacher.strip() or None,
+                link=link.strip() or None,
             )
             session.add(lesson)
             await session.commit()
+        return RedirectResponse("/schedule", status_code=303)
+
+    @app.get("/schedule/{lesson_id}/edit", response_class=HTMLResponse)
+    async def schedule_edit_view(request: Request, lesson_id: int):
+        redirect = redirect_if_unauthed(request)
+        if redirect:
+            return redirect
+        async with async_session() as session:
+            lesson = await session.get(Lesson, lesson_id)
+            if not lesson:
+                return RedirectResponse("/schedule", status_code=303)
+        return templates.TemplateResponse(
+            request, "schedule_edit.html", {"lesson": lesson, "day_names": DAY_NAMES}
+        )
+
+    @app.post("/schedule/{lesson_id}/edit")
+    async def schedule_edit_submit(
+        request: Request,
+        lesson_id: int,
+        day_of_week: int = Form(...),
+        start_time: str = Form(...),
+        end_time: str = Form(""),
+        subject: str = Form(...),
+        room: str = Form(""),
+        teacher: str = Form(""),
+        link: str = Form(""),
+    ):
+        redirect = redirect_if_unauthed(request)
+        if redirect:
+            return redirect
+        async with async_session() as session:
+            lesson = await session.get(Lesson, lesson_id)
+            if lesson:
+                lesson.day_of_week = day_of_week
+                lesson.start_time = dt.time.fromisoformat(start_time)
+                lesson.end_time = dt.time.fromisoformat(end_time) if end_time else None
+                lesson.subject = subject.strip()
+                lesson.room = room.strip() or None
+                lesson.teacher = teacher.strip() or None
+                lesson.link = link.strip() or None
+                await session.commit()
         return RedirectResponse("/schedule", status_code=303)
 
     @app.post("/schedule/{lesson_id}/delete")

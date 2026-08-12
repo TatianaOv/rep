@@ -28,6 +28,7 @@ class Lesson(Base):
     subject: Mapped[str] = mapped_column(String(200))
     room: Mapped[str | None] = mapped_column(String(50), nullable=True)
     teacher: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    link: Mapped[str | None] = mapped_column(String(500), nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
 
 

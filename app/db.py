@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
@@ -33,3 +34,12 @@ async def init_db() -> None:
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await _add_missing_columns(conn)
+
+
+async def _add_missing_columns(conn) -> None:
+    """Lightweight migration: add columns introduced after a table already existed."""
+    result = await conn.execute(text("PRAGMA table_info(lessons)"))
+    columns = {row[1] for row in result.fetchall()}
+    if "link" not in columns:
+        await conn.execute(text("ALTER TABLE lessons ADD COLUMN link VARCHAR(500)"))
