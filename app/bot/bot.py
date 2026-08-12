@@ -9,13 +9,13 @@ from aiogram.filters import Command, CommandStart
 from aiogram.types import BotCommand, CallbackQuery, InlineKeyboardMarkup, Message
 from sqlalchemy import select
 
-from app.ai_companion import get_ai_reply
+from app.ai_companion import get_ai_turn
 from app.config import config
 from app.constants import DAY_NAMES
 from app.db import async_session
 from app.formatting import format_homework, format_lessons
 from app.keyboards import homework_done_keyboard
-from app.models import Homework, Lesson, Recipient
+from app.models import Homework, Lesson, PlannerSettings, Recipient
 from app.services import (
     add_ai_message,
     clear_ai_history,
@@ -25,6 +25,7 @@ from app.services import (
     get_or_create_settings,
     get_or_create_student,
 )
+from app.voice import transcribe_voice
 from app.weeks import current_week_number, lesson_is_active_this_week
 
 router = Router()
@@ -50,6 +51,60 @@ CELEBRATIONS = [
     "Учёба идёт отлично! 🌟",
     "Мозг прокачан! 🧠⚡",
 ]
+
+
+async def _build_today(session, settings_row: PlannerSettings) -> tuple[str, InlineKeyboardMarkup | None]:
+    today = dt.date.today()
+    weekday = today.weekday()
+    result = await session.execute(
+        select(Lesson).where(Lesson.day_of_week == weekday, Lesson.active.is_(True)).order_by(Lesson.start_time)
+    )
+    lessons = [lesson for lesson in result.scalars().all() if lesson_is_active_this_week(lesson, settings_row, today)]
+    result = await session.execute(
+        select(Homework).where(Homework.due_date == today, Homework.done.is_(False)).order_by(Homework.due_time)
+    )
+    hw = result.scalars().all()
+
+    text = f"📅 {DAY_NAMES[weekday]}, {today.strftime('%d.%m')}\n\n{format_lessons(lessons)}"
+    if hw:
+        text += f"\n\n📚 ДЗ на сегодня:\n\n{format_homework(hw)}"
+    return text, homework_done_keyboard(hw)
+
+
+async def _build_week(session, settings_row: PlannerSettings) -> str:
+    today = dt.date.today()
+    result = await session.execute(
+        select(Lesson).where(Lesson.active.is_(True)).order_by(Lesson.day_of_week, Lesson.start_time)
+    )
+    lessons = [lesson for lesson in result.scalars().all() if lesson_is_active_this_week(lesson, settings_row, today)]
+    by_day: dict[int, list[Lesson]] = {}
+    for lesson in lessons:
+        by_day.setdefault(lesson.day_of_week, []).append(lesson)
+
+    if not by_day:
+        return "Расписание пока не заполнено."
+
+    header = ""
+    if settings_row.biweekly_enabled:
+        anchor = settings_row.biweekly_anchor_date or today
+        header = f"(Неделя {current_week_number(today, anchor)})\n\n"
+
+    today_weekday = today.weekday()
+    parts = [
+        f"{DAY_NAMES[day]}{' (СЕГОДНЯ)' if day == today_weekday else ''}:\n{format_lessons(by_day[day])}"
+        for day in range(7)
+        if day in by_day
+    ]
+    return header + "\n\n".join(parts)
+
+
+async def _build_homework(session) -> tuple[str, InlineKeyboardMarkup | None]:
+    today = dt.date.today()
+    result = await session.execute(
+        select(Homework).where(Homework.done.is_(False), Homework.due_date >= today).order_by(Homework.due_date)
+    )
+    hw = result.scalars().all()
+    return f"📚 Домашние задания:\n\n{format_homework(hw)}", homework_done_keyboard(hw)
 
 
 @router.message(CommandStart())
@@ -89,27 +144,9 @@ async def cmd_today(message: Message) -> None:
         if not await find_recipient_by_chat_id(session, message.chat.id):
             await message.answer("Бот не привязан к этому чату. Обратитесь к родителю.")
             return
-
         settings_row = await get_or_create_settings(session)
-        today = dt.date.today()
-        weekday = today.weekday()
-        result = await session.execute(
-            select(Lesson).where(Lesson.day_of_week == weekday, Lesson.active.is_(True)).order_by(Lesson.start_time)
-        )
-        lessons = [
-            lesson for lesson in result.scalars().all() if lesson_is_active_this_week(lesson, settings_row, today)
-        ]
-        result = await session.execute(
-            select(Homework)
-            .where(Homework.due_date == today, Homework.done.is_(False))
-            .order_by(Homework.due_time)
-        )
-        hw = result.scalars().all()
-
-        text = f"📅 {DAY_NAMES[weekday]}, {today.strftime('%d.%m')}\n\n{format_lessons(lessons)}"
-        if hw:
-            text += f"\n\n📚 ДЗ на сегодня:\n\n{format_homework(hw)}"
-        await message.answer(text, reply_markup=homework_done_keyboard(hw), parse_mode="HTML")
+        text, markup = await _build_today(session, settings_row)
+    await message.answer(text, reply_markup=markup, parse_mode="HTML")
 
 
 @router.message(Command("week"))
@@ -118,35 +155,9 @@ async def cmd_week(message: Message) -> None:
         if not await find_recipient_by_chat_id(session, message.chat.id):
             await message.answer("Бот не привязан к этому чату. Обратитесь к родителю.")
             return
-
         settings_row = await get_or_create_settings(session)
-        today = dt.date.today()
-        result = await session.execute(
-            select(Lesson).where(Lesson.active.is_(True)).order_by(Lesson.day_of_week, Lesson.start_time)
-        )
-        lessons = [
-            lesson for lesson in result.scalars().all() if lesson_is_active_this_week(lesson, settings_row, today)
-        ]
-        by_day: dict[int, list[Lesson]] = {}
-        for lesson in lessons:
-            by_day.setdefault(lesson.day_of_week, []).append(lesson)
-
-        if not by_day:
-            await message.answer("Расписание пока не заполнено.")
-            return
-
-        header = ""
-        if settings_row.biweekly_enabled:
-            anchor = settings_row.biweekly_anchor_date or today
-            header = f"(Неделя {current_week_number(today, anchor)})\n\n"
-
-        today_weekday = today.weekday()
-        parts = [
-            f"{DAY_NAMES[day]}{' (СЕГОДНЯ)' if day == today_weekday else ''}:\n{format_lessons(by_day[day])}"
-            for day in range(7)
-            if day in by_day
-        ]
-        await message.answer(header + "\n\n".join(parts), parse_mode="HTML")
+        text = await _build_week(session, settings_row)
+    await message.answer(text, parse_mode="HTML")
 
 
 @router.message(Command("homework"))
@@ -155,19 +166,8 @@ async def cmd_homework(message: Message) -> None:
         if not await find_recipient_by_chat_id(session, message.chat.id):
             await message.answer("Бот не привязан к этому чату. Обратитесь к родителю.")
             return
-
-        today = dt.date.today()
-        result = await session.execute(
-            select(Homework)
-            .where(Homework.done.is_(False), Homework.due_date >= today)
-            .order_by(Homework.due_date)
-        )
-        hw = result.scalars().all()
-        await message.answer(
-            f"📚 Домашние задания:\n\n{format_homework(hw)}",
-            reply_markup=homework_done_keyboard(hw),
-            parse_mode="HTML",
-        )
+        text, markup = await _build_homework(session)
+    await message.answer(text, reply_markup=markup, parse_mode="HTML")
 
 
 @router.message(Command("help"))
@@ -241,9 +241,9 @@ async def cmd_reset(message: Message) -> None:
     await message.answer("Окей, начнём с чистого листа 🌱")
 
 
-@router.message(F.text, ~F.text.startswith("/"))
-async def handle_free_text(message: Message) -> None:
-    """Free-form messages (not a command) go to the private AI companion, if enabled."""
+async def _companion_turn(message: Message, text: str) -> None:
+    """Route a free-form (typed or transcribed) message: schedule/homework intents get
+    exact data straight from the database; anything else goes to the private AI chat."""
     async with async_session() as session:
         recipient = await find_recipient_by_chat_id(session, message.chat.id)
         if not recipient:
@@ -256,34 +256,87 @@ async def handle_free_text(message: Message) -> None:
             return
 
         student = await get_or_create_student(session)
-        await add_ai_message(session, recipient.id, "user", message.text)
         history = await get_ai_history(session, recipient.id)
-        api_messages = [{"role": m.role, "content": m.content} for m in history]
+        api_messages = [{"role": m.role, "content": m.content} for m in history] + [
+            {"role": "user", "content": text}
+        ]
         recipient_id = recipient.id
         recipient_label = recipient.label
 
     try:
-        reply = await get_ai_reply(api_messages, student.name)
+        turn = await get_ai_turn(api_messages, student.name)
     except Exception:
         await message.answer("Что-то пошло не так, попробуй ещё раз чуть позже 🙏")
         return
 
+    if turn.action in ("show_today", "show_week", "show_homework"):
+        async with async_session() as session:
+            settings_row = await get_or_create_settings(session)
+            if turn.action == "show_today":
+                reply_text, markup = await _build_today(session, settings_row)
+            elif turn.action == "show_week":
+                reply_text, markup = await _build_week(session, settings_row), None
+            else:
+                reply_text, markup = await _build_homework(session)
+        await message.answer(reply_text, reply_markup=markup, parse_mode="HTML")
+        return
+
+    reply_text = turn.reply or "Извини, не получилось ответить 🙈"
     async with async_session() as session:
-        await add_ai_message(session, recipient_id, "assistant", reply.text)
+        await add_ai_message(session, recipient_id, "user", text)
+        await add_ai_message(session, recipient_id, "assistant", reply_text)
 
-    await message.answer(reply.text)
+    await message.answer(reply_text)
 
-    if reply.concern:
+    if turn.concern:
         async with async_session() as session:
             result = await session.execute(select(Recipient).where(Recipient.notify_on_safety_concern.is_(True)))
             admins = list(result.scalars().all())
         who = recipient_label or "Кто-то"
         alert = (
             f"⚠️ Бот заметил тревожный сигнал в переписке с {who}:\n"
-            f"{reply.concern_summary or 'нужно обратить внимание'}\n\nПожалуйста, поговорите."
+            f"{turn.concern_summary or 'нужно обратить внимание'}\n\nПожалуйста, поговорите."
         )
         for admin in admins:
             await message.bot.send_message(admin.telegram_chat_id, alert)
+
+
+@router.message(F.text, ~F.text.startswith("/"))
+async def handle_free_text(message: Message) -> None:
+    await _companion_turn(message, message.text)
+
+
+@router.message(F.voice)
+async def handle_voice(message: Message) -> None:
+    async with async_session() as session:
+        recipient = await find_recipient_by_chat_id(session, message.chat.id)
+        if not recipient:
+            await message.answer("Нужен код привязки. Спроси его у родителя и отправь команду:\n/start КОД")
+            return
+        settings_row = await get_or_create_settings(session)
+
+    if not settings_row.ai_companion_enabled or not config.anthropic_api_key:
+        await message.answer(f"Не поняла 🙂\n\n{HELP_TEXT}")
+        return
+
+    if not config.openai_api_key:
+        await message.answer("Голосовые сообщения пока не настроены — напиши мне текстом 🙂")
+        return
+
+    try:
+        file_info = await message.bot.get_file(message.voice.file_id)
+        buffer = await message.bot.download_file(file_info.file_path)
+        text = await transcribe_voice(buffer.read())
+    except Exception:
+        await message.answer("Не получилось разобрать голосовое, попробуй написать текстом 🙏")
+        return
+
+    if not text:
+        await message.answer("Не расслышала, можешь написать текстом? 🙂")
+        return
+
+    await message.answer(f"🎤 Услышала: «{text}»")
+    await _companion_turn(message, text)
 
 
 def create_bot_and_dispatcher() -> tuple[Bot, Dispatcher]:

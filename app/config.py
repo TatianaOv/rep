@@ -20,6 +20,7 @@ class AppConfig:
     web_port: int = int(os.environ.get("WEB_PORT", "8000"))
     anthropic_api_key: str = os.environ.get("ANTHROPIC_API_KEY", "")
     anthropic_model: str = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5")
+    openai_api_key: str = os.environ.get("OPENAI_API_KEY", "")
 
 
 config = AppConfig()
