@@ -310,6 +310,7 @@ def create_app() -> FastAPI:
                 "student": student,
                 "recipients": recipients,
                 "pending_codes": pending_codes,
+                "ai_api_key_configured": bool(config.anthropic_api_key),
             },
         )
 
@@ -325,6 +326,7 @@ def create_app() -> FastAPI:
         homework_reminder_days_before: int = Form(...),
         biweekly_enabled: str = Form(""),
         biweekly_anchor_date: str = Form(""),
+        ai_companion_enabled: str = Form(""),
     ):
         redirect = redirect_if_unauthed(request)
         if redirect:
@@ -345,6 +347,7 @@ def create_app() -> FastAPI:
             settings_row.biweekly_anchor_date = (
                 dt.date.fromisoformat(biweekly_anchor_date) if biweekly_anchor_date.strip() else None
             )
+            settings_row.ai_companion_enabled = bool(ai_companion_enabled)
             await session.commit()
         return RedirectResponse("/settings", status_code=303)
 
@@ -390,6 +393,18 @@ def create_app() -> FastAPI:
             recipient = await session.get(Recipient, recipient_id)
             if recipient:
                 recipient.notify_on_homework_done = not recipient.notify_on_homework_done
+                await session.commit()
+        return RedirectResponse("/settings", status_code=303)
+
+    @app.post("/settings/recipients/{recipient_id}/toggle_safety")
+    async def settings_recipient_toggle_safety(request: Request, recipient_id: int):
+        redirect = redirect_if_unauthed(request)
+        if redirect:
+            return redirect
+        async with async_session() as session:
+            recipient = await session.get(Recipient, recipient_id)
+            if recipient:
+                recipient.notify_on_safety_concern = not recipient.notify_on_safety_concern
                 await session.commit()
         return RedirectResponse("/settings", status_code=303)
 

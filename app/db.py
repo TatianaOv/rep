@@ -51,6 +51,8 @@ async def _add_missing_columns(conn) -> None:
     recipient_columns = {row[1] for row in result.fetchall()}
     if "notify_on_homework_done" not in recipient_columns:
         await conn.execute(text("ALTER TABLE recipients ADD COLUMN notify_on_homework_done BOOLEAN DEFAULT 0"))
+    if "notify_on_safety_concern" not in recipient_columns:
+        await conn.execute(text("ALTER TABLE recipients ADD COLUMN notify_on_safety_concern BOOLEAN DEFAULT 0"))
 
     result = await conn.execute(text("PRAGMA table_info(planner_settings)"))
     settings_columns = {row[1] for row in result.fetchall()}
@@ -58,6 +60,8 @@ async def _add_missing_columns(conn) -> None:
         await conn.execute(text("ALTER TABLE planner_settings ADD COLUMN biweekly_enabled BOOLEAN DEFAULT 0"))
     if "biweekly_anchor_date" not in settings_columns:
         await conn.execute(text("ALTER TABLE planner_settings ADD COLUMN biweekly_anchor_date DATE"))
+    if "ai_companion_enabled" not in settings_columns:
+        await conn.execute(text("ALTER TABLE planner_settings ADD COLUMN ai_companion_enabled BOOLEAN DEFAULT 0"))
 
 
 async def _migrate_legacy_student_link(conn) -> None:

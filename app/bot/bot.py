@@ -9,23 +9,36 @@ from aiogram.filters import Command, CommandStart
 from aiogram.types import BotCommand, CallbackQuery, InlineKeyboardMarkup, Message
 from sqlalchemy import select
 
+from app.ai_companion import get_ai_reply
 from app.config import config
 from app.constants import DAY_NAMES
 from app.db import async_session
 from app.formatting import format_homework, format_lessons
 from app.keyboards import homework_done_keyboard
 from app.models import Homework, Lesson, Recipient
-from app.services import consume_link_code, find_recipient_by_chat_id, get_or_create_settings
+from app.services import (
+    add_ai_message,
+    clear_ai_history,
+    consume_link_code,
+    find_recipient_by_chat_id,
+    get_ai_history,
+    get_or_create_settings,
+    get_or_create_student,
+)
 from app.weeks import current_week_number, lesson_is_active_this_week
 
 router = Router()
 
-HELP_TEXT = "Команды:\n/today — расписание и ДЗ на сегодня\n/week — расписание на неделю\n/homework — список ДЗ"
+HELP_TEXT = (
+    "Команды:\n/today — расписание и ДЗ на сегодня\n/week — расписание на неделю\n"
+    "/homework — список ДЗ\n/reset — начать разговор с ботом заново"
+)
 
 BOT_COMMANDS = [
     BotCommand(command="today", description="Расписание и ДЗ на сегодня"),
     BotCommand(command="week", description="Расписание на неделю"),
     BotCommand(command="homework", description="Список домашних заданий"),
+    BotCommand(command="reset", description="Начать разговор с ботом заново"),
     BotCommand(command="help", description="Список команд"),
 ]
 
@@ -215,6 +228,62 @@ async def cb_homework_done(callback: CallbackQuery) -> None:
             target.telegram_chat_id,
             f"✅ {who} отметил(а) домашку выполненной: {subject} — {description}",
         )
+
+
+@router.message(Command("reset"))
+async def cmd_reset(message: Message) -> None:
+    async with async_session() as session:
+        recipient = await find_recipient_by_chat_id(session, message.chat.id)
+        if not recipient:
+            await message.answer("Бот не привязан к этому чату. Обратитесь к родителю.")
+            return
+        await clear_ai_history(session, recipient.id)
+    await message.answer("Окей, начнём с чистого листа 🌱")
+
+
+@router.message(F.text, ~F.text.startswith("/"))
+async def handle_free_text(message: Message) -> None:
+    """Free-form messages (not a command) go to the private AI companion, if enabled."""
+    async with async_session() as session:
+        recipient = await find_recipient_by_chat_id(session, message.chat.id)
+        if not recipient:
+            await message.answer("Нужен код привязки. Спроси его у родителя и отправь команду:\n/start КОД")
+            return
+
+        settings_row = await get_or_create_settings(session)
+        if not settings_row.ai_companion_enabled or not config.anthropic_api_key:
+            await message.answer(f"Не поняла 🙂\n\n{HELP_TEXT}")
+            return
+
+        student = await get_or_create_student(session)
+        await add_ai_message(session, recipient.id, "user", message.text)
+        history = await get_ai_history(session, recipient.id)
+        api_messages = [{"role": m.role, "content": m.content} for m in history]
+        recipient_id = recipient.id
+        recipient_label = recipient.label
+
+    try:
+        reply = await get_ai_reply(api_messages, student.name)
+    except Exception:
+        await message.answer("Что-то пошло не так, попробуй ещё раз чуть позже 🙏")
+        return
+
+    async with async_session() as session:
+        await add_ai_message(session, recipient_id, "assistant", reply.text)
+
+    await message.answer(reply.text)
+
+    if reply.concern:
+        async with async_session() as session:
+            result = await session.execute(select(Recipient).where(Recipient.notify_on_safety_concern.is_(True)))
+            admins = list(result.scalars().all())
+        who = recipient_label or "Кто-то"
+        alert = (
+            f"⚠️ Бот заметил тревожный сигнал в переписке с {who}:\n"
+            f"{reply.concern_summary or 'нужно обратить внимание'}\n\nПожалуйста, поговорите."
+        )
+        for admin in admins:
+            await message.bot.send_message(admin.telegram_chat_id, alert)
 
 
 def create_bot_and_dispatcher() -> tuple[Bot, Dispatcher]:

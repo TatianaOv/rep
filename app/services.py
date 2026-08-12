@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import secrets
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import LinkCode, PlannerSettings, Recipient, Student
+from app.models import AiMessage, LinkCode, PlannerSettings, Recipient, Student
+
+AI_HISTORY_CONTEXT_LIMIT = 20  # messages sent to the model as conversation context
+AI_HISTORY_RETENTION_LIMIT = 40  # hard cap on stored messages per recipient
 
 
 async def get_or_create_settings(session: AsyncSession) -> PlannerSettings:
@@ -56,3 +59,36 @@ async def create_link_code(session: AsyncSession, label: str | None) -> LinkCode
 async def consume_link_code(session: AsyncSession, code: str) -> LinkCode | None:
     result = await session.execute(select(LinkCode).where(LinkCode.code == code))
     return result.scalar_one_or_none()
+
+
+async def get_ai_history(session: AsyncSession, recipient_id: int) -> list[AiMessage]:
+    result = await session.execute(
+        select(AiMessage)
+        .where(AiMessage.recipient_id == recipient_id)
+        .order_by(AiMessage.created_at.desc())
+        .limit(AI_HISTORY_CONTEXT_LIMIT)
+    )
+    rows = list(result.scalars().all())
+    rows.reverse()
+    return rows
+
+
+async def add_ai_message(session: AsyncSession, recipient_id: int, role: str, content: str) -> None:
+    session.add(AiMessage(recipient_id=recipient_id, role=role, content=content))
+    await session.commit()
+
+    result = await session.execute(
+        select(AiMessage.id)
+        .where(AiMessage.recipient_id == recipient_id)
+        .order_by(AiMessage.created_at.desc())
+        .offset(AI_HISTORY_RETENTION_LIMIT)
+    )
+    old_ids = [row[0] for row in result.all()]
+    if old_ids:
+        await session.execute(delete(AiMessage).where(AiMessage.id.in_(old_ids)))
+        await session.commit()
+
+
+async def clear_ai_history(session: AsyncSession, recipient_id: int) -> None:
+    await session.execute(delete(AiMessage).where(AiMessage.recipient_id == recipient_id))
+    await session.commit()

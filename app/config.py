@@ -18,6 +18,8 @@ class AppConfig:
     session_secret: str = os.environ.get("SESSION_SECRET_KEY", "insecure-dev-secret-change-me")
     web_host: str = os.environ.get("WEB_HOST", "0.0.0.0")
     web_port: int = int(os.environ.get("WEB_PORT", "8000"))
+    anthropic_api_key: str = os.environ.get("ANTHROPIC_API_KEY", "")
+    anthropic_model: str = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5")
 
 
 config = AppConfig()

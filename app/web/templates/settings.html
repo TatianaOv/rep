@@ -8,7 +8,7 @@
     {% if recipients %}
       <table class="table">
         <thead>
-          <tr><th>Кто</th><th>Telegram</th><th>Подключён</th><th>Увед. о ДЗ</th><th></th></tr>
+          <tr><th>Кто</th><th>Telegram</th><th>Подключён</th><th>Увед. о ДЗ</th><th>Увед. о тревоге</th><th></th></tr>
         </thead>
         <tbody>
           {% for r in recipients %}
@@ -22,6 +22,11 @@
                 </form>
               </td>
               <td>
+                <form method="post" action="/settings/recipients/{{ r.id }}/toggle_safety">
+                  <button type="submit">{{ '🚨 Вкл' if r.notify_on_safety_concern else '🔕 Выкл' }}</button>
+                </form>
+              </td>
+              <td>
                 <form method="post" action="/settings/recipients/{{ r.id }}/delete" onsubmit="return confirm('Отключить этого получателя от напоминаний?');">
                   <button type="submit" class="danger">Отключить</button>
                 </form>
@@ -30,7 +35,7 @@
           {% endfor %}
         </tbody>
       </table>
-      <p class="muted">«Увед. о ДЗ» — этот получатель будет узнавать, когда кто-то другой отмечает домашку выполненной (например, вы как родитель).</p>
+      <p class="muted">«Увед. о ДЗ» — этот получатель будет узнавать, когда кто-то другой отмечает домашку выполненной. «Увед. о тревоге» — этот получатель получит сигнал, если ИИ-собеседник заметит признаки реальной опасности в разговоре (см. ниже).</p>
     {% else %}
       <p class="muted">Пока никто не подключён.</p>
     {% endif %}
@@ -81,8 +86,31 @@
       <label>Начало Недели 1 (любой понедельник)
         <input type="date" name="biweekly_anchor_date" value="{{ settings.biweekly_anchor_date.isoformat() if settings.biweekly_anchor_date else '' }}">
       </label>
+      <label class="checkbox">
+        <input type="checkbox" name="ai_companion_enabled" {% if settings.ai_companion_enabled %}checked{% endif %} {% if not ai_api_key_configured %}disabled{% endif %}>
+        ИИ-собеседник (можно просто написать боту, не только команды)
+      </label>
       <button type="submit">Сохранить</button>
     </form>
     <p class="muted">Если включено — в расписании у каждого урока можно указать, на какой неделе он проходит. Бот сам определит, какая неделя сейчас идёт, и будет присылать напоминания только по актуальному расписанию.</p>
+  </section>
+
+  <section class="card">
+    <h2>ИИ-собеседник</h2>
+    {% if ai_api_key_configured %}
+      <p class="muted">Ключ Anthropic API настроен ✅. Включите галочку выше, чтобы бот отвечал на обычные сообщения (не только команды).</p>
+    {% else %}
+      <p class="muted">Чтобы включить, укажите <code>ANTHROPIC_API_KEY</code> в файле <code>.env</code> и перезапустите бота — тогда галочка выше станет доступна.</p>
+    {% endif %}
+    <p class="muted">
+      Разговор с ИИ-собеседником <strong>полностью приватный</strong> — он нигде не отображается в этой панели.
+      Единственное исключение: если бот заметит реальные признаки опасности (мысли о самоповреждении, насилие,
+      угроза безопасности), получателям с включённым «Увед. о тревоге» придёт короткий сигнал с сутью проблемы.
+      Обычные жалобы на школу, усталость, ссоры с друзьями — это не повод для сигнала, всё остаётся приватным.
+    </p>
+    <p class="muted">
+      Учтите: сама переписка технически хранится в базе данных бота на этом компьютере (файл <code>data/bot.db</code>).
+      Она нигде не показывается в интерфейсе, но не является зашифрованной.
+    </p>
   </section>
 {% endblock %}

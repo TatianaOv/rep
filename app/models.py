@@ -26,6 +26,7 @@ class Recipient(Base):
     telegram_username: Mapped[str | None] = mapped_column(String(100), nullable=True)
     linked_at: Mapped[dt.datetime] = mapped_column(DateTime, server_default=func.now())
     notify_on_homework_done: Mapped[bool] = mapped_column(Boolean, default=False)
+    notify_on_safety_concern: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class LinkCode(Base):
@@ -78,6 +79,23 @@ class PlannerSettings(Base):
     homework_reminder_days_before: Mapped[int] = mapped_column(Integer, default=1)
     biweekly_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     biweekly_anchor_date: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
+    ai_companion_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class AiMessage(Base):
+    """Private chat history between a recipient and the AI companion.
+
+    Never surfaced in the web panel — the only place its content is ever
+    read back out is to give the AI conversational context.
+    """
+
+    __tablename__ = "ai_messages"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    recipient_id: Mapped[int] = mapped_column(Integer)
+    role: Mapped[str] = mapped_column(String(20))  # "user" or "assistant"
+    content: Mapped[str] = mapped_column(String(4000))
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, server_default=func.now())
 
 
 class ReminderLog(Base):
