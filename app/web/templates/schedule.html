@@ -26,6 +26,9 @@
                 {% if biweekly_enabled %}<td>{{ 'Обе' if l.week == 0 else l.week }}</td>{% endif %}
                 <td class="actions">
                   <a class="button-link" href="/schedule/{{ l.id }}/edit">Изменить</a>
+                  <form method="post" action="/schedule/{{ l.id }}/copy">
+                    <button type="submit">Копировать</button>
+                  </form>
                   <form method="post" action="/schedule/{{ l.id }}/delete" onsubmit="return confirm('Удалить урок?');">
                     <button type="submit" class="danger">Удалить</button>
                   </form>

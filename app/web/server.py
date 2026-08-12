@@ -207,16 +207,42 @@ def create_app() -> FastAPI:
                 await session.commit()
         return RedirectResponse("/schedule", status_code=303)
 
+    @app.post("/schedule/{lesson_id}/copy")
+    async def schedule_copy(request: Request, lesson_id: int):
+        redirect = redirect_if_unauthed(request)
+        if redirect:
+            return redirect
+        async with async_session() as session:
+            lesson = await session.get(Lesson, lesson_id)
+            if lesson:
+                copy = Lesson(
+                    day_of_week=lesson.day_of_week,
+                    start_time=lesson.start_time,
+                    end_time=lesson.end_time,
+                    subject=lesson.subject,
+                    room=lesson.room,
+                    teacher=lesson.teacher,
+                    link=lesson.link,
+                    week=lesson.week,
+                    active=lesson.active,
+                )
+                session.add(copy)
+                await session.commit()
+        return RedirectResponse("/schedule", status_code=303)
+
     # ---------- Homework ----------
     @app.get("/homework", response_class=HTMLResponse)
-    async def homework_view(request: Request):
+    async def homework_view(request: Request, copy_from: int | None = None):
         redirect = redirect_if_unauthed(request)
         if redirect:
             return redirect
         async with async_session() as session:
             result = await session.execute(select(Homework).order_by(Homework.done, Homework.due_date))
             items = result.scalars().all()
-        return templates.TemplateResponse(request, "homework.html", {"items": items})
+            copy_source = await session.get(Homework, copy_from) if copy_from else None
+        return templates.TemplateResponse(
+            request, "homework.html", {"items": items, "copy_source": copy_source}
+        )
 
     @app.post("/homework/add")
     async def homework_add(

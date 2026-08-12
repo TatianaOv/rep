@@ -88,8 +88,8 @@ async def cmd_today(message: Message) -> None:
 
         text = f"📅 {DAY_NAMES[weekday]}, {today.strftime('%d.%m')}\n\n{format_lessons(lessons)}"
         if hw:
-            text += f"\n\n📚 ДЗ на сегодня:\n{format_homework(hw)}"
-        await message.answer(text, reply_markup=homework_done_keyboard(hw))
+            text += f"\n\n📚 ДЗ на сегодня:\n\n{format_homework(hw)}"
+        await message.answer(text, reply_markup=homework_done_keyboard(hw), parse_mode="HTML")
 
 
 @router.message(Command("week"))
@@ -121,7 +121,7 @@ async def cmd_week(message: Message) -> None:
             header = f"(Неделя {current_week_number(today, anchor)})\n\n"
 
         parts = [f"{DAY_NAMES[day]}:\n{format_lessons(by_day[day])}" for day in range(7) if day in by_day]
-        await message.answer(header + "\n\n".join(parts))
+        await message.answer(header + "\n\n".join(parts), parse_mode="HTML")
 
 
 @router.message(Command("homework"))
@@ -138,7 +138,11 @@ async def cmd_homework(message: Message) -> None:
             .order_by(Homework.due_date)
         )
         hw = result.scalars().all()
-        await message.answer(f"📚 Домашние задания:\n{format_homework(hw)}", reply_markup=homework_done_keyboard(hw))
+        await message.answer(
+            f"📚 Домашние задания:\n\n{format_homework(hw)}",
+            reply_markup=homework_done_keyboard(hw),
+            parse_mode="HTML",
+        )
 
 
 @router.message(Command("help"))

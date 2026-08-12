@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 from typing import Iterable
 
 from app.models import Homework, Lesson
@@ -12,13 +13,13 @@ def format_lessons(lessons: Iterable[Lesson]) -> str:
     lines = []
     for lesson in lessons:
         t = lesson.start_time.strftime("%H:%M")
-        line = f"{t} — {lesson.subject}"
+        line = f"{t} — {html.escape(lesson.subject)}"
         if lesson.teacher:
-            line += f", {lesson.teacher}"
+            line += f", {html.escape(lesson.teacher)}"
         if lesson.room:
-            line += f" (каб. {lesson.room})"
+            line += f" (каб. {html.escape(lesson.room)})"
         if lesson.link:
-            line += f"\n🔗 {lesson.link}"
+            line += f"\n🔗 {html.escape(lesson.link)}"
         lines.append(line)
     return "\n".join(lines)
 
@@ -30,5 +31,7 @@ def format_homework(items: Iterable[Homework]) -> str:
     lines = []
     for hw in items:
         d = hw.due_date.strftime("%d.%m")
-        lines.append(f"• {hw.subject} — {hw.description} (до {d})")
-    return "\n".join(lines)
+        subject = html.escape(hw.subject)
+        description = html.escape(hw.description)
+        lines.append(f"• <b>{subject}</b> — {description} (до {d})")
+    return "\n\n".join(lines)

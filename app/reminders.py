@@ -38,10 +38,14 @@ async def _log_sent(session, kind: str, ref_id: int | None, sent_date: dt.date) 
 
 
 async def _broadcast(
-    bot: Bot, recipients: list[Recipient], text: str, reply_markup: InlineKeyboardMarkup | None = None
+    bot: Bot,
+    recipients: list[Recipient],
+    text: str,
+    reply_markup: InlineKeyboardMarkup | None = None,
+    parse_mode: str | None = None,
 ) -> None:
     for recipient in recipients:
-        await bot.send_message(recipient.telegram_chat_id, text, reply_markup=reply_markup)
+        await bot.send_message(recipient.telegram_chat_id, text, reply_markup=reply_markup, parse_mode=parse_mode)
 
 
 async def tick(bot: Bot) -> None:
@@ -79,8 +83,8 @@ async def tick(bot: Bot) -> None:
                 hw = result.scalars().all()
                 text = f"Доброе утро! 📅 {DAY_NAMES[weekday]}, {today.strftime('%d.%m')}\n\n{format_lessons(lessons)}"
                 if hw:
-                    text += f"\n\n📚 ДЗ на сегодня:\n{format_homework(hw)}"
-                await _broadcast(bot, recipients, text, homework_done_keyboard(hw))
+                    text += f"\n\n📚 ДЗ на сегодня:\n\n{format_homework(hw)}"
+                await _broadcast(bot, recipients, text, homework_done_keyboard(hw), parse_mode="HTML")
                 await _log_sent(session, "morning_digest", None, today)
 
         # --- Reminder before each lesson ---
