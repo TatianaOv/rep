@@ -13,6 +13,8 @@ def format_lessons(lessons: Iterable[Lesson]) -> str:
     for lesson in lessons:
         t = lesson.start_time.strftime("%H:%M")
         line = f"{t} — {lesson.subject}"
+        if lesson.teacher:
+            line += f", {lesson.teacher}"
         if lesson.room:
             line += f" (каб. {lesson.room})"
         if lesson.link:

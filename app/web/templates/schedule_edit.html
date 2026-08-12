@@ -18,6 +18,13 @@
       <label>Кабинет <input type="text" name="room" value="{{ lesson.room or '' }}"></label>
       <label>Учитель <input type="text" name="teacher" value="{{ lesson.teacher or '' }}"></label>
       <label>Ссылка на созвон <input type="url" name="link" value="{{ lesson.link or '' }}" placeholder="https://zoom.us/..."></label>
+      <label>Неделя
+        <select name="week">
+          <option value="0" {% if lesson.week == 0 %}selected{% endif %}>Обе недели</option>
+          <option value="1" {% if lesson.week == 1 %}selected{% endif %}>Неделя 1</option>
+          <option value="2" {% if lesson.week == 2 %}selected{% endif %}>Неделя 2</option>
+        </select>
+      </label>
       <button type="submit">Сохранить</button>
       <a class="button-link" href="/schedule">Отмена</a>
     </form>

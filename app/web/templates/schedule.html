@@ -3,13 +3,17 @@
 {% block content %}
   <h1>Расписание уроков</h1>
 
+  {% if biweekly_enabled %}
+    <p class="muted">Расписание чередуется по неделям. Сейчас идёт: <strong>Неделя {{ current_week }}</strong></p>
+  {% endif %}
+
   {% for day in range(7) %}
     <section class="card">
       <h2>{{ day_names[day] }}</h2>
       {% if by_day[day] %}
         <table class="table">
           <thead>
-            <tr><th>Время</th><th>Предмет</th><th>Кабинет</th><th>Учитель</th><th>Ссылка</th><th></th></tr>
+            <tr><th>Время</th><th>Предмет</th><th>Кабинет</th><th>Учитель</th><th>Ссылка</th>{% if biweekly_enabled %}<th>Неделя</th>{% endif %}<th></th></tr>
           </thead>
           <tbody>
             {% for l in by_day[day] %}
@@ -19,6 +23,7 @@
                 <td>{{ l.room or '' }}</td>
                 <td>{{ l.teacher or '' }}</td>
                 <td>{% if l.link %}<a href="{{ l.link }}" target="_blank" rel="noopener">Подключиться ↗</a>{% endif %}</td>
+                {% if biweekly_enabled %}<td>{{ 'Обе' if l.week == 0 else l.week }}</td>{% endif %}
                 <td class="actions">
                   <a class="button-link" href="/schedule/{{ l.id }}/edit">Изменить</a>
                   <form method="post" action="/schedule/{{ l.id }}/delete" onsubmit="return confirm('Удалить урок?');">
@@ -49,6 +54,13 @@
       <label>Кабинет <input type="text" name="room"></label>
       <label>Учитель <input type="text" name="teacher"></label>
       <label>Ссылка на созвон <input type="url" name="link" placeholder="https://zoom.us/..."></label>
+      <label>Неделя
+        <select name="week">
+          <option value="0">Обе недели</option>
+          <option value="1">Неделя 1</option>
+          <option value="2">Неделя 2</option>
+        </select>
+      </label>
       <button type="submit">Добавить</button>
     </form>
   </section>

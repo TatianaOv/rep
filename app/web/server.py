@@ -21,6 +21,7 @@ from app.services import (
     get_pending_link_codes,
     get_recipients,
 )
+from app.weeks import current_week_number, lesson_is_active_this_week
 
 BASE_DIR = os.path.dirname(__file__)
 
@@ -63,6 +64,7 @@ def create_app() -> FastAPI:
             return redirect
         async with async_session() as session:
             recipients = await get_recipients(session)
+            settings_row = await get_or_create_settings(session)
             today = dt.date.today()
             weekday = today.weekday()
             result = await session.execute(
@@ -70,7 +72,9 @@ def create_app() -> FastAPI:
                 .where(Lesson.day_of_week == weekday, Lesson.active.is_(True))
                 .order_by(Lesson.start_time)
             )
-            today_lessons = result.scalars().all()
+            today_lessons = [
+                lesson for lesson in result.scalars().all() if lesson_is_active_this_week(lesson, settings_row, today)
+            ]
             result = await session.execute(
                 select(Homework)
                 .where(Homework.done.is_(False), Homework.due_date >= today)
@@ -98,11 +102,24 @@ def create_app() -> FastAPI:
         async with async_session() as session:
             result = await session.execute(select(Lesson).order_by(Lesson.day_of_week, Lesson.start_time))
             lessons = result.scalars().all()
+            settings_row = await get_or_create_settings(session)
         by_day: dict[int, list[Lesson]] = {i: [] for i in range(7)}
         for lesson in lessons:
             by_day[lesson.day_of_week].append(lesson)
+        current_week = None
+        if settings_row.biweekly_enabled:
+            today = dt.date.today()
+            anchor = settings_row.biweekly_anchor_date or today
+            current_week = current_week_number(today, anchor)
         return templates.TemplateResponse(
-            request, "schedule.html", {"by_day": by_day, "day_names": DAY_NAMES}
+            request,
+            "schedule.html",
+            {
+                "by_day": by_day,
+                "day_names": DAY_NAMES,
+                "biweekly_enabled": settings_row.biweekly_enabled,
+                "current_week": current_week,
+            },
         )
 
     @app.post("/schedule/add")
@@ -115,6 +132,7 @@ def create_app() -> FastAPI:
         room: str = Form(""),
         teacher: str = Form(""),
         link: str = Form(""),
+        week: int = Form(0),
     ):
         redirect = redirect_if_unauthed(request)
         if redirect:
@@ -128,6 +146,7 @@ def create_app() -> FastAPI:
                 room=room.strip() or None,
                 teacher=teacher.strip() or None,
                 link=link.strip() or None,
+                week=week,
             )
             session.add(lesson)
             await session.commit()
@@ -157,6 +176,7 @@ def create_app() -> FastAPI:
         room: str = Form(""),
         teacher: str = Form(""),
         link: str = Form(""),
+        week: int = Form(0),
     ):
         redirect = redirect_if_unauthed(request)
         if redirect:
@@ -171,6 +191,7 @@ def create_app() -> FastAPI:
                 lesson.room = room.strip() or None
                 lesson.teacher = teacher.strip() or None
                 lesson.link = link.strip() or None
+                lesson.week = week
                 await session.commit()
         return RedirectResponse("/schedule", status_code=303)
 
@@ -275,6 +296,8 @@ def create_app() -> FastAPI:
         lesson_reminder_minutes: str = Form(""),
         homework_reminder_time: str = Form(...),
         homework_reminder_days_before: int = Form(...),
+        biweekly_enabled: str = Form(""),
+        biweekly_anchor_date: str = Form(""),
     ):
         redirect = redirect_if_unauthed(request)
         if redirect:
@@ -291,6 +314,10 @@ def create_app() -> FastAPI:
             )
             settings_row.homework_reminder_time = dt.time.fromisoformat(homework_reminder_time)
             settings_row.homework_reminder_days_before = homework_reminder_days_before
+            settings_row.biweekly_enabled = bool(biweekly_enabled)
+            settings_row.biweekly_anchor_date = (
+                dt.date.fromisoformat(biweekly_anchor_date) if biweekly_anchor_date.strip() else None
+            )
             await session.commit()
         return RedirectResponse("/settings", status_code=303)
 
@@ -324,6 +351,18 @@ def create_app() -> FastAPI:
             recipient = await session.get(Recipient, recipient_id)
             if recipient:
                 await session.delete(recipient)
+                await session.commit()
+        return RedirectResponse("/settings", status_code=303)
+
+    @app.post("/settings/recipients/{recipient_id}/toggle_notify")
+    async def settings_recipient_toggle_notify(request: Request, recipient_id: int):
+        redirect = redirect_if_unauthed(request)
+        if redirect:
+            return redirect
+        async with async_session() as session:
+            recipient = await session.get(Recipient, recipient_id)
+            if recipient:
+                recipient.notify_on_homework_done = not recipient.notify_on_homework_done
                 await session.commit()
         return RedirectResponse("/settings", status_code=303)
 

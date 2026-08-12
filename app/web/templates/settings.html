@@ -8,7 +8,7 @@
     {% if recipients %}
       <table class="table">
         <thead>
-          <tr><th>Кто</th><th>Telegram</th><th>Подключён</th><th></th></tr>
+          <tr><th>Кто</th><th>Telegram</th><th>Подключён</th><th>Увед. о ДЗ</th><th></th></tr>
         </thead>
         <tbody>
           {% for r in recipients %}
@@ -16,6 +16,11 @@
               <td>{{ r.label or '—' }}</td>
               <td>{{ '@' + r.telegram_username if r.telegram_username else '—' }}</td>
               <td>{{ r.linked_at.strftime('%d.%m.%Y') }}</td>
+              <td>
+                <form method="post" action="/settings/recipients/{{ r.id }}/toggle_notify">
+                  <button type="submit">{{ '🔔 Вкл' if r.notify_on_homework_done else '🔕 Выкл' }}</button>
+                </form>
+              </td>
               <td>
                 <form method="post" action="/settings/recipients/{{ r.id }}/delete" onsubmit="return confirm('Отключить этого получателя от напоминаний?');">
                   <button type="submit" class="danger">Отключить</button>
@@ -25,6 +30,7 @@
           {% endfor %}
         </tbody>
       </table>
+      <p class="muted">«Увед. о ДЗ» — этот получатель будет узнавать, когда кто-то другой отмечает домашку выполненной (например, вы как родитель).</p>
     {% else %}
       <p class="muted">Пока никто не подключён.</p>
     {% endif %}
@@ -68,7 +74,15 @@
       <label>За сколько дней напоминать заранее
         <input type="number" name="homework_reminder_days_before" min="0" value="{{ settings.homework_reminder_days_before }}" required>
       </label>
+      <label class="checkbox">
+        <input type="checkbox" name="biweekly_enabled" {% if settings.biweekly_enabled %}checked{% endif %}>
+        Расписание чередуется по неделям (Неделя 1 / Неделя 2)
+      </label>
+      <label>Начало Недели 1 (любой понедельник)
+        <input type="date" name="biweekly_anchor_date" value="{{ settings.biweekly_anchor_date.isoformat() if settings.biweekly_anchor_date else '' }}">
+      </label>
       <button type="submit">Сохранить</button>
     </form>
+    <p class="muted">Если включено — в расписании у каждого урока можно указать, на какой неделе он проходит. Бот сам определит, какая неделя сейчас идёт, и будет присылать напоминания только по актуальному расписанию.</p>
   </section>
 {% endblock %}

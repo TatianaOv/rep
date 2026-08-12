@@ -25,6 +25,7 @@ class Recipient(Base):
     telegram_chat_id: Mapped[int] = mapped_column(Integer, unique=True)
     telegram_username: Mapped[str | None] = mapped_column(String(100), nullable=True)
     linked_at: Mapped[dt.datetime] = mapped_column(DateTime, server_default=func.now())
+    notify_on_homework_done: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class LinkCode(Base):
@@ -50,6 +51,7 @@ class Lesson(Base):
     teacher: Mapped[str | None] = mapped_column(String(100), nullable=True)
     link: Mapped[str | None] = mapped_column(String(500), nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    week: Mapped[int] = mapped_column(Integer, default=0)  # 0 = every week, 1 = week 1 only, 2 = week 2 only
 
 
 class Homework(Base):
@@ -74,6 +76,8 @@ class PlannerSettings(Base):
     lesson_reminder_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True, default=15)
     homework_reminder_time: Mapped[dt.time] = mapped_column(Time, default=dt.time(19, 0))
     homework_reminder_days_before: Mapped[int] = mapped_column(Integer, default=1)
+    biweekly_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    biweekly_anchor_date: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
 
 
 class ReminderLog(Base):

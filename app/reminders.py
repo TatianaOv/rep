@@ -4,14 +4,17 @@ import datetime as dt
 from zoneinfo import ZoneInfo
 
 from aiogram import Bot
+from aiogram.types import InlineKeyboardMarkup
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.constants import DAY_NAMES
 from app.db import async_session
 from app.formatting import format_homework, format_lessons
+from app.keyboards import homework_done_keyboard
 from app.models import Homework, Lesson, Recipient, ReminderLog
 from app.services import get_or_create_settings, get_recipients
+from app.weeks import lesson_is_active_this_week
 
 
 async def _already_sent(session, kind: str, ref_id: int | None, sent_date: dt.date) -> bool:
@@ -34,9 +37,11 @@ async def _log_sent(session, kind: str, ref_id: int | None, sent_date: dt.date) 
         await session.rollback()
 
 
-async def _broadcast(bot: Bot, recipients: list[Recipient], text: str) -> None:
+async def _broadcast(
+    bot: Bot, recipients: list[Recipient], text: str, reply_markup: InlineKeyboardMarkup | None = None
+) -> None:
     for recipient in recipients:
-        await bot.send_message(recipient.telegram_chat_id, text)
+        await bot.send_message(recipient.telegram_chat_id, text, reply_markup=reply_markup)
 
 
 async def tick(bot: Bot) -> None:
@@ -61,7 +66,11 @@ async def tick(bot: Bot) -> None:
                     .where(Lesson.day_of_week == weekday, Lesson.active.is_(True))
                     .order_by(Lesson.start_time)
                 )
-                lessons = result.scalars().all()
+                lessons = [
+                    lesson
+                    for lesson in result.scalars().all()
+                    if lesson_is_active_this_week(lesson, settings_row, today)
+                ]
                 result = await session.execute(
                     select(Homework)
                     .where(Homework.due_date == today, Homework.done.is_(False))
@@ -71,7 +80,7 @@ async def tick(bot: Bot) -> None:
                 text = f"Доброе утро! 📅 {DAY_NAMES[weekday]}, {today.strftime('%d.%m')}\n\n{format_lessons(lessons)}"
                 if hw:
                     text += f"\n\n📚 ДЗ на сегодня:\n{format_homework(hw)}"
-                await _broadcast(bot, recipients, text)
+                await _broadcast(bot, recipients, text, homework_done_keyboard(hw))
                 await _log_sent(session, "morning_digest", None, today)
 
         # --- Reminder before each lesson ---
@@ -80,6 +89,8 @@ async def tick(bot: Bot) -> None:
                 select(Lesson).where(Lesson.day_of_week == today.weekday(), Lesson.active.is_(True))
             )
             for lesson in result.scalars().all():
+                if not lesson_is_active_this_week(lesson, settings_row, today):
+                    continue
                 reminder_dt = dt.datetime.combine(today, lesson.start_time, tzinfo=tz) - dt.timedelta(
                     minutes=settings_row.lesson_reminder_minutes
                 )
@@ -87,6 +98,8 @@ async def tick(bot: Bot) -> None:
                     session, "lesson", lesson.id, today
                 ):
                     text = f"⏰ Через {settings_row.lesson_reminder_minutes} мин: {lesson.subject}"
+                    if lesson.teacher:
+                        text += f", {lesson.teacher}"
                     if lesson.room:
                         text += f" (каб. {lesson.room})"
                     if lesson.link:
@@ -101,7 +114,12 @@ async def tick(bot: Bot) -> None:
             )
             for hw in result.scalars().all():
                 if not await _already_sent(session, "homework_due", hw.id, today):
-                    await _broadcast(bot, recipients, f"📌 Сегодня срок сдачи: {hw.subject} — {hw.description}")
+                    await _broadcast(
+                        bot,
+                        recipients,
+                        f"📌 Сегодня срок сдачи: {hw.subject} — {hw.description}",
+                        homework_done_keyboard([hw]),
+                    )
                     await _log_sent(session, "homework_due", hw.id, today)
 
             soon_date = today + dt.timedelta(days=settings_row.homework_reminder_days_before)
@@ -114,5 +132,6 @@ async def tick(bot: Bot) -> None:
                         bot,
                         recipients,
                         f"📝 Скоро дедлайн ({soon_date.strftime('%d.%m')}): {hw.subject} — {hw.description}",
+                        homework_done_keyboard([hw]),
                     )
                     await _log_sent(session, "homework_due_soon", hw.id, today)
