@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import datetime as dt
 import secrets
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import AiMessage, LinkCode, PlannerSettings, Recipient, Student
+from app.models import AiMessage, LessonPing, LinkCode, PlannerSettings, Recipient, Student
 
 AI_HISTORY_CONTEXT_LIMIT = 20  # messages sent to the model as conversation context
 AI_HISTORY_RETENTION_LIMIT = 40  # hard cap on stored messages per recipient
@@ -92,3 +93,16 @@ async def add_ai_message(session: AsyncSession, recipient_id: int, role: str, co
 async def clear_ai_history(session: AsyncSession, recipient_id: int) -> None:
     await session.execute(delete(AiMessage).where(AiMessage.recipient_id == recipient_id))
     await session.commit()
+
+
+async def get_or_create_lesson_ping(session: AsyncSession, lesson_id: int, ping_date: dt.date) -> LessonPing:
+    result = await session.execute(
+        select(LessonPing).where(LessonPing.lesson_id == lesson_id, LessonPing.ping_date == ping_date)
+    )
+    row = result.scalar_one_or_none()
+    if row is None:
+        row = LessonPing(lesson_id=lesson_id, ping_date=ping_date)
+        session.add(row)
+        await session.commit()
+        await session.refresh(row)
+    return row

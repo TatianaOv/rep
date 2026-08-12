@@ -62,6 +62,14 @@ async def _add_missing_columns(conn) -> None:
         await conn.execute(text("ALTER TABLE planner_settings ADD COLUMN biweekly_anchor_date DATE"))
     if "ai_companion_enabled" not in settings_columns:
         await conn.execute(text("ALTER TABLE planner_settings ADD COLUMN ai_companion_enabled BOOLEAN DEFAULT 0"))
+    if "lesson_reminder_repeat_enabled" not in settings_columns:
+        await conn.execute(
+            text("ALTER TABLE planner_settings ADD COLUMN lesson_reminder_repeat_enabled BOOLEAN DEFAULT 0")
+        )
+    if "lesson_reminder_repeat_minutes" not in settings_columns:
+        await conn.execute(
+            text("ALTER TABLE planner_settings ADD COLUMN lesson_reminder_repeat_minutes INTEGER DEFAULT 5")
+        )
 
 
 async def _migrate_legacy_student_link(conn) -> None:

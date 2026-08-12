@@ -80,6 +80,22 @@ class PlannerSettings(Base):
     biweekly_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     biweekly_anchor_date: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
     ai_companion_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    lesson_reminder_repeat_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    lesson_reminder_repeat_minutes: Mapped[int] = mapped_column(Integer, default=5)
+
+
+class LessonPing(Base):
+    """Tracks repeated nudges for a lesson reminder until someone acknowledges it."""
+
+    __tablename__ = "lesson_pings"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    lesson_id: Mapped[int] = mapped_column(Integer)
+    ping_date: Mapped[dt.date] = mapped_column(Date)
+    last_sent_at: Mapped[dt.datetime | None] = mapped_column(DateTime, nullable=True)
+    acknowledged_at: Mapped[dt.datetime | None] = mapped_column(DateTime, nullable=True)
+
+    __table_args__ = (UniqueConstraint("lesson_id", "ping_date", name="uq_lesson_ping"),)
 
 
 class AiMessage(Base):

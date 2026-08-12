@@ -75,6 +75,13 @@
       <label>Напоминание перед уроком, мин (пусто — выключить)
         <input type="number" name="lesson_reminder_minutes" min="0" value="{{ settings.lesson_reminder_minutes if settings.lesson_reminder_minutes is not none else '' }}">
       </label>
+      <label class="checkbox">
+        <input type="checkbox" name="lesson_reminder_repeat_enabled" {% if settings.lesson_reminder_repeat_enabled %}checked{% endif %}>
+        Повторять напоминание об уроке, пока не отметят «Урок пройден»
+      </label>
+      <label>Интервал повтора, мин
+        <input type="number" name="lesson_reminder_repeat_minutes" min="1" value="{{ settings.lesson_reminder_repeat_minutes }}">
+      </label>
       <label>Время напоминаний о ДЗ <input type="time" name="homework_reminder_time" value="{{ settings.homework_reminder_time.strftime('%H:%M') }}" required></label>
       <label>За сколько дней напоминать заранее
         <input type="number" name="homework_reminder_days_before" min="0" value="{{ settings.homework_reminder_days_before }}" required>
@@ -93,6 +100,7 @@
       <button type="submit">Сохранить</button>
     </form>
     <p class="muted">Если включено — в расписании у каждого урока можно указать, на какой неделе он проходит. Бот сам определит, какая неделя сейчас идёт, и будет присылать напоминания только по актуальному расписанию.</p>
+    <p class="muted">«Повторять напоминание об уроке» — если включено, под напоминанием появится кнопка «✅ Урок пройден». Пока никто из получателей её не нажмёт, бот будет присылать напоминание повторно с указанным интервалом (перестаёт сам, когда урок заканчивается по расписанию).</p>
   </section>
 
   <section class="card">

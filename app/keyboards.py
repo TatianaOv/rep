@@ -18,3 +18,9 @@ def homework_done_keyboard(items: Iterable[Homework]) -> InlineKeyboardMarkup | 
             label = label[:37] + "..."
         rows.append([InlineKeyboardButton(text=label, callback_data=f"hwdone:{hw.id}")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def lesson_ack_keyboard(lesson_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[[InlineKeyboardButton(text="✅ Урок пройден", callback_data=f"lessonack:{lesson_id}")]]
+    )

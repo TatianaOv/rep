@@ -328,6 +328,8 @@ def create_app() -> FastAPI:
         biweekly_enabled: str = Form(""),
         biweekly_anchor_date: str = Form(""),
         ai_companion_enabled: str = Form(""),
+        lesson_reminder_repeat_enabled: str = Form(""),
+        lesson_reminder_repeat_minutes: int = Form(5),
     ):
         redirect = redirect_if_unauthed(request)
         if redirect:
@@ -349,6 +351,8 @@ def create_app() -> FastAPI:
                 dt.date.fromisoformat(biweekly_anchor_date) if biweekly_anchor_date.strip() else None
             )
             settings_row.ai_companion_enabled = bool(ai_companion_enabled)
+            settings_row.lesson_reminder_repeat_enabled = bool(lesson_reminder_repeat_enabled)
+            settings_row.lesson_reminder_repeat_minutes = max(1, lesson_reminder_repeat_minutes)
             await session.commit()
         return RedirectResponse("/settings", status_code=303)
 

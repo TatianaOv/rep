@@ -11,9 +11,9 @@ from sqlalchemy.exc import IntegrityError
 from app.constants import DAY_NAMES
 from app.db import async_session
 from app.formatting import format_homework, format_lessons
-from app.keyboards import homework_done_keyboard
+from app.keyboards import homework_done_keyboard, lesson_ack_keyboard
 from app.models import Homework, Lesson, Recipient, ReminderLog
-from app.services import get_or_create_settings, get_recipients
+from app.services import get_or_create_lesson_ping, get_or_create_settings, get_recipients
 from app.weeks import lesson_is_active_this_week
 
 
@@ -46,6 +46,17 @@ async def _broadcast(
 ) -> None:
     for recipient in recipients:
         await bot.send_message(recipient.telegram_chat_id, text, reply_markup=reply_markup, parse_mode=parse_mode)
+
+
+def _lesson_text(lesson: Lesson, minutes: int) -> str:
+    text = f"⏰ Через {minutes} мин: {lesson.subject}"
+    if lesson.teacher:
+        text += f", {lesson.teacher}"
+    if lesson.room:
+        text += f" (каб. {lesson.room})"
+    if lesson.link:
+        text += f"\n🔗 {lesson.link}"
+    return text
 
 
 async def tick(bot: Bot) -> None:
@@ -98,18 +109,44 @@ async def tick(bot: Bot) -> None:
                 reminder_dt = dt.datetime.combine(today, lesson.start_time, tzinfo=tz) - dt.timedelta(
                     minutes=settings_row.lesson_reminder_minutes
                 )
-                if reminder_dt.strftime("%H:%M") == hhmm and not await _already_sent(
-                    session, "lesson", lesson.id, today
-                ):
-                    text = f"⏰ Через {settings_row.lesson_reminder_minutes} мин: {lesson.subject}"
-                    if lesson.teacher:
-                        text += f", {lesson.teacher}"
-                    if lesson.room:
-                        text += f" (каб. {lesson.room})"
-                    if lesson.link:
-                        text += f"\n🔗 {lesson.link}"
-                    await _broadcast(bot, recipients, text)
-                    await _log_sent(session, "lesson", lesson.id, today)
+
+                if not settings_row.lesson_reminder_repeat_enabled:
+                    if reminder_dt.strftime("%H:%M") == hhmm and not await _already_sent(
+                        session, "lesson", lesson.id, today
+                    ):
+                        await _broadcast(bot, recipients, _lesson_text(lesson, settings_row.lesson_reminder_minutes))
+                        await _log_sent(session, "lesson", lesson.id, today)
+                    continue
+
+                # Repeat mode: nudge every N minutes from reminder_dt until acknowledged,
+                # giving up once the lesson's window (end_time, or +1h fallback) has passed.
+                if now < reminder_dt:
+                    continue
+                window_end = (
+                    dt.datetime.combine(today, lesson.end_time, tzinfo=tz)
+                    if lesson.end_time
+                    else reminder_dt + dt.timedelta(hours=1)
+                )
+                if now > window_end:
+                    continue
+
+                ping = await get_or_create_lesson_ping(session, lesson.id, today)
+                if ping.acknowledged_at:
+                    continue
+                now_naive = now.replace(tzinfo=None)
+                if ping.last_sent_at is not None:
+                    elapsed_minutes = (now_naive - ping.last_sent_at).total_seconds() / 60
+                    if elapsed_minutes < settings_row.lesson_reminder_repeat_minutes:
+                        continue
+
+                await _broadcast(
+                    bot,
+                    recipients,
+                    _lesson_text(lesson, settings_row.lesson_reminder_minutes),
+                    lesson_ack_keyboard(lesson.id),
+                )
+                ping.last_sent_at = now_naive
+                await session.commit()
 
         # --- Homework reminders ---
         if settings_row.homework_reminder_time.strftime("%H:%M") == hhmm:

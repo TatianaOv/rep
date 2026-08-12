@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import logging
 import random
 
 from aiogram import Bot, Dispatcher, F, Router
@@ -22,11 +23,14 @@ from app.services import (
     consume_link_code,
     find_recipient_by_chat_id,
     get_ai_history,
+    get_or_create_lesson_ping,
     get_or_create_settings,
     get_or_create_student,
 )
 from app.voice import transcribe_voice
 from app.weeks import current_week_number, lesson_is_active_this_week
+
+logger = logging.getLogger(__name__)
 
 router = Router()
 
@@ -230,6 +234,30 @@ async def cb_homework_done(callback: CallbackQuery) -> None:
         )
 
 
+@router.callback_query(F.data.startswith("lessonack:"))
+async def cb_lesson_ack(callback: CallbackQuery) -> None:
+    lesson_id = int(callback.data.split(":", 1)[1])
+    async with async_session() as session:
+        recipient = await find_recipient_by_chat_id(session, callback.message.chat.id)
+        if not recipient:
+            await callback.answer("Бот не привязан к этому чату.", show_alert=True)
+            return
+
+        today = dt.date.today()
+        ping = await get_or_create_lesson_ping(session, lesson_id, today)
+        already_acked = ping.acknowledged_at is not None
+        if not already_acked:
+            ping.acknowledged_at = dt.datetime.utcnow()
+            await session.commit()
+
+    try:
+        await callback.message.edit_reply_markup(reply_markup=None)
+    except TelegramBadRequest:
+        pass
+
+    await callback.answer("Уже было отмечено ✅" if already_acked else "Отмечено, больше не буду напоминать ✅")
+
+
 @router.message(Command("reset"))
 async def cmd_reset(message: Message) -> None:
     async with async_session() as session:
@@ -266,6 +294,7 @@ async def _companion_turn(message: Message, text: str) -> None:
     try:
         turn = await get_ai_turn(api_messages, student.name)
     except Exception:
+        logger.exception("AI companion call failed")
         await message.answer("Что-то пошло не так, попробуй ещё раз чуть позже 🙏")
         return
 
@@ -328,6 +357,7 @@ async def handle_voice(message: Message) -> None:
         buffer = await message.bot.download_file(file_info.file_path)
         text = await transcribe_voice(buffer.read())
     except Exception:
+        logger.exception("Voice transcription failed")
         await message.answer("Не получилось разобрать голосовое, попробуй написать текстом 🙏")
         return
 
