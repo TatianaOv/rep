@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import datetime as dt
 import os
-import secrets
 
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -14,8 +13,14 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.config import config
 from app.constants import DAY_NAMES
 from app.db import async_session
-from app.models import Homework, Lesson
-from app.services import get_or_create_settings, get_or_create_student
+from app.models import Homework, LinkCode, Lesson, Recipient
+from app.services import (
+    create_link_code,
+    get_or_create_settings,
+    get_or_create_student,
+    get_pending_link_codes,
+    get_recipients,
+)
 
 BASE_DIR = os.path.dirname(__file__)
 
@@ -57,7 +62,7 @@ def create_app() -> FastAPI:
         if redirect:
             return redirect
         async with async_session() as session:
-            student = await get_or_create_student(session)
+            recipients = await get_recipients(session)
             today = dt.date.today()
             weekday = today.weekday()
             result = await session.execute(
@@ -77,7 +82,7 @@ def create_app() -> FastAPI:
             request,
             "dashboard.html",
             {
-                "student": student,
+                "recipients": recipients,
                 "today_name": DAY_NAMES[weekday],
                 "today_lessons": today_lessons,
                 "upcoming_hw": upcoming_hw,
@@ -247,8 +252,17 @@ def create_app() -> FastAPI:
         async with async_session() as session:
             settings_row = await get_or_create_settings(session)
             student = await get_or_create_student(session)
+            recipients = await get_recipients(session)
+            pending_codes = await get_pending_link_codes(session)
         return templates.TemplateResponse(
-            request, "settings.html", {"settings": settings_row, "student": student}
+            request,
+            "settings.html",
+            {
+                "settings": settings_row,
+                "student": student,
+                "recipients": recipients,
+                "pending_codes": pending_codes,
+            },
         )
 
     @app.post("/settings/update")
@@ -281,27 +295,36 @@ def create_app() -> FastAPI:
         return RedirectResponse("/settings", status_code=303)
 
     @app.post("/settings/link_code")
-    async def settings_link_code(request: Request):
+    async def settings_link_code(request: Request, label: str = Form("")):
         redirect = redirect_if_unauthed(request)
         if redirect:
             return redirect
         async with async_session() as session:
-            settings_row = await get_or_create_settings(session)
-            settings_row.link_code = secrets.token_hex(3)
-            await session.commit()
+            await create_link_code(session, label)
         return RedirectResponse("/settings", status_code=303)
 
-    @app.post("/settings/unlink")
-    async def settings_unlink(request: Request):
+    @app.post("/settings/link_codes/{code_id}/delete")
+    async def settings_link_code_cancel(request: Request, code_id: int):
         redirect = redirect_if_unauthed(request)
         if redirect:
             return redirect
         async with async_session() as session:
-            student = await get_or_create_student(session)
-            student.telegram_chat_id = None
-            student.telegram_username = None
-            student.linked_at = None
-            await session.commit()
+            link_code = await session.get(LinkCode, code_id)
+            if link_code:
+                await session.delete(link_code)
+                await session.commit()
+        return RedirectResponse("/settings", status_code=303)
+
+    @app.post("/settings/recipients/{recipient_id}/delete")
+    async def settings_recipient_delete(request: Request, recipient_id: int):
+        redirect = redirect_if_unauthed(request)
+        if redirect:
+            return redirect
+        async with async_session() as session:
+            recipient = await session.get(Recipient, recipient_id)
+            if recipient:
+                await session.delete(recipient)
+                await session.commit()
         return RedirectResponse("/settings", status_code=303)
 
     return app

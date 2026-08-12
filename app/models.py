@@ -13,9 +13,29 @@ class Student(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(100), default="Дочь")
-    telegram_chat_id: Mapped[int | None] = mapped_column(Integer, nullable=True, unique=True)
+
+
+class Recipient(Base):
+    """A Telegram chat that receives schedule/homework reminders."""
+
+    __tablename__ = "recipients"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    label: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    telegram_chat_id: Mapped[int] = mapped_column(Integer, unique=True)
     telegram_username: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    linked_at: Mapped[dt.datetime | None] = mapped_column(DateTime, nullable=True)
+    linked_at: Mapped[dt.datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class LinkCode(Base):
+    """A one-time code a parent generates so one more person can link to the bot."""
+
+    __tablename__ = "link_codes"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(String(20), unique=True)
+    label: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, server_default=func.now())
 
 
 class Lesson(Base):
@@ -54,7 +74,6 @@ class PlannerSettings(Base):
     lesson_reminder_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True, default=15)
     homework_reminder_time: Mapped[dt.time] = mapped_column(Time, default=dt.time(19, 0))
     homework_reminder_days_before: Mapped[int] = mapped_column(Integer, default=1)
-    link_code: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
 
 class ReminderLog(Base):

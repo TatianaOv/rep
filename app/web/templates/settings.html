@@ -4,23 +4,51 @@
   <h1>Настройки</h1>
 
   <section class="card">
-    <h2>Дочь и подключение бота</h2>
-    <p>Имя: <strong>{{ student.name }}</strong></p>
-    {% if student.telegram_chat_id %}
-      <p>Статус: ✅ подключено (username: {{ student.telegram_username or '—' }})</p>
-      <form method="post" action="/settings/unlink" onsubmit="return confirm('Отвязать бота от дочери?');">
-        <button type="submit" class="danger">Отвязать</button>
-      </form>
+    <h2>Кто получает напоминания</h2>
+    {% if recipients %}
+      <table class="table">
+        <thead>
+          <tr><th>Кто</th><th>Telegram</th><th>Подключён</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for r in recipients %}
+            <tr>
+              <td>{{ r.label or '—' }}</td>
+              <td>{{ '@' + r.telegram_username if r.telegram_username else '—' }}</td>
+              <td>{{ r.linked_at.strftime('%d.%m.%Y') }}</td>
+              <td>
+                <form method="post" action="/settings/recipients/{{ r.id }}/delete" onsubmit="return confirm('Отключить этого получателя от напоминаний?');">
+                  <button type="submit" class="danger">Отключить</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     {% else %}
-      <p>Статус: ❌ не подключено</p>
-      {% if settings.link_code %}
-        <p>Код привязки: <code>{{ settings.link_code }}</code></p>
-        <p class="muted">Попроси дочь открыть бота в Telegram и отправить: <code>/start {{ settings.link_code }}</code></p>
-      {% endif %}
-      <form method="post" action="/settings/link_code">
-        <button type="submit">Сгенерировать код привязки</button>
-      </form>
+      <p class="muted">Пока никто не подключён.</p>
     {% endif %}
+
+    {% if pending_codes %}
+      <h2>Коды, ожидающие активации</h2>
+      <ul class="list">
+        {% for c in pending_codes %}
+          <li>
+            <code>{{ c.code }}</code>{% if c.label %} — для «{{ c.label }}»{% endif %}
+            <form method="post" action="/settings/link_codes/{{ c.id }}/delete" style="display:inline">
+              <button type="submit" class="danger">Отменить</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+
+    <h2>Добавить получателя</h2>
+    <form method="post" action="/settings/link_code" class="form-grid">
+      <label>Для кого (необязательно) <input type="text" name="label" placeholder="Мама, Бабушка..."></label>
+      <button type="submit">Сгенерировать код привязки</button>
+    </form>
+    <p class="muted">Дайте получателю код — он открывает бота в Telegram и отправляет команду <code>/start КОД</code></p>
   </section>
 
   <section class="card">

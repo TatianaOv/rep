@@ -3,10 +3,10 @@
 {% block content %}
   <h1>Привет!</h1>
   <p class="muted">
-    {% if student.telegram_chat_id %}
-      Бот подключён к {{ student.name }} ✅
+    {% if recipients %}
+      Бот подключён, получателей напоминаний: {{ recipients|length }} ✅
     {% else %}
-      Бот ещё не подключён к дочери. Зайди в <a href="/settings">Настройки</a> и сгенерируй код привязки.
+      Бот ещё ни к кому не подключён. Зайди в <a href="/settings">Настройки</a> и сгенерируй код привязки.
     {% endif %}
   </p>
 

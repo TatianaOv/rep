@@ -11,59 +11,49 @@ from app.config import config
 from app.constants import DAY_NAMES
 from app.db import async_session
 from app.formatting import format_homework, format_lessons
-from app.models import Homework, Lesson
-from app.services import get_or_create_settings, get_or_create_student
+from app.models import Homework, Lesson, Recipient
+from app.services import consume_link_code, find_recipient_by_chat_id
 
 router = Router()
+
+HELP_TEXT = "Команды:\n/today — расписание и ДЗ на сегодня\n/week — расписание на неделю\n/homework — список ДЗ"
 
 
 @router.message(CommandStart())
 async def cmd_start(message: Message) -> None:
     async with async_session() as session:
-        student = await get_or_create_student(session)
-        settings_row = await get_or_create_settings(session)
+        existing = await find_recipient_by_chat_id(session, message.chat.id)
+        if existing:
+            await message.answer(f"Привет! Бот уже подключён к этому чату 👋\n{HELP_TEXT}")
+            return
 
         args = (message.text or "").split(maxsplit=1)
         code = args[1].strip() if len(args) > 1 else None
 
-        if student.telegram_chat_id == message.chat.id:
-            await message.answer(
-                f"Привет, {student.name}! Бот уже подключён 👋\n"
-                "Команды:\n/today — расписание и ДЗ на сегодня\n/week — расписание на неделю\n/homework — список ДЗ"
-            )
-            return
-
-        if student.telegram_chat_id is not None:
-            await message.answer("Этот бот уже привязан к другому аккаунту. Обратитесь к родителю.")
-            return
-
-        if not settings_row.link_code:
-            await message.answer(
-                "Бот пока не готов к подключению. Попроси родителя сгенерировать код привязки в веб-панели "
-                "(раздел «Настройки»)."
-            )
-            return
-
-        if code != settings_row.link_code:
+        if not code:
             await message.answer("Нужен код привязки. Спроси его у родителя и отправь команду:\n/start КОД")
             return
 
-        student.telegram_chat_id = message.chat.id
-        student.telegram_username = message.from_user.username if message.from_user else None
-        student.linked_at = dt.datetime.utcnow()
-        settings_row.link_code = None
-        await session.commit()
-        await message.answer(
-            f"Готово! Бот подключён, {student.name} 🎉\n\n"
-            "Команды:\n/today — расписание и ДЗ на сегодня\n/week — расписание на неделю\n/homework — список ДЗ"
+        link_code = await consume_link_code(session, code)
+        if not link_code:
+            await message.answer("Код неверен или уже использован. Попроси родителя выдать новый в веб-панели.")
+            return
+
+        recipient = Recipient(
+            label=link_code.label,
+            telegram_chat_id=message.chat.id,
+            telegram_username=message.from_user.username if message.from_user else None,
         )
+        session.add(recipient)
+        await session.delete(link_code)
+        await session.commit()
+        await message.answer(f"Готово! Бот подключён 🎉\n\n{HELP_TEXT}")
 
 
 @router.message(Command("today"))
 async def cmd_today(message: Message) -> None:
     async with async_session() as session:
-        student = await get_or_create_student(session)
-        if student.telegram_chat_id != message.chat.id:
+        if not await find_recipient_by_chat_id(session, message.chat.id):
             await message.answer("Бот не привязан к этому чату. Обратитесь к родителю.")
             return
 
@@ -89,8 +79,7 @@ async def cmd_today(message: Message) -> None:
 @router.message(Command("week"))
 async def cmd_week(message: Message) -> None:
     async with async_session() as session:
-        student = await get_or_create_student(session)
-        if student.telegram_chat_id != message.chat.id:
+        if not await find_recipient_by_chat_id(session, message.chat.id):
             await message.answer("Бот не привязан к этому чату. Обратитесь к родителю.")
             return
 
@@ -113,8 +102,7 @@ async def cmd_week(message: Message) -> None:
 @router.message(Command("homework"))
 async def cmd_homework(message: Message) -> None:
     async with async_session() as session:
-        student = await get_or_create_student(session)
-        if student.telegram_chat_id != message.chat.id:
+        if not await find_recipient_by_chat_id(session, message.chat.id):
             await message.answer("Бот не привязан к этому чату. Обратитесь к родителю.")
             return
 
@@ -130,9 +118,7 @@ async def cmd_homework(message: Message) -> None:
 
 @router.message(Command("help"))
 async def cmd_help(message: Message) -> None:
-    await message.answer(
-        "Команды:\n/today — расписание и ДЗ на сегодня\n/week — расписание на неделю\n/homework — список ДЗ"
-    )
+    await message.answer(HELP_TEXT)
 
 
 def create_bot_and_dispatcher() -> tuple[Bot, Dispatcher]:

@@ -35,6 +35,7 @@ async def init_db() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         await _add_missing_columns(conn)
+        await _migrate_legacy_student_link(conn)
 
 
 async def _add_missing_columns(conn) -> None:
@@ -43,3 +44,29 @@ async def _add_missing_columns(conn) -> None:
     columns = {row[1] for row in result.fetchall()}
     if "link" not in columns:
         await conn.execute(text("ALTER TABLE lessons ADD COLUMN link VARCHAR(500)"))
+
+
+async def _migrate_legacy_student_link(conn) -> None:
+    """One-time move of the old single-recipient link (students.telegram_chat_id)
+    into the new recipients table, for databases created before multi-recipient support."""
+    result = await conn.execute(text("PRAGMA table_info(students)"))
+    student_columns = {row[1] for row in result.fetchall()}
+    if "telegram_chat_id" not in student_columns:
+        return
+
+    result = await conn.execute(text("SELECT COUNT(*) FROM recipients"))
+    if result.scalar() > 0:
+        return
+
+    result = await conn.execute(
+        text("SELECT telegram_chat_id, telegram_username FROM students WHERE telegram_chat_id IS NOT NULL LIMIT 1")
+    )
+    row = result.fetchone()
+    if row:
+        await conn.execute(
+            text(
+                "INSERT INTO recipients (label, telegram_chat_id, telegram_username, linked_at) "
+                "VALUES ('Дочь', :chat_id, :username, CURRENT_TIMESTAMP)"
+            ),
+            {"chat_id": row[0], "username": row[1]},
+        )

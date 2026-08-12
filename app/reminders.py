@@ -10,8 +10,8 @@ from sqlalchemy.exc import IntegrityError
 from app.constants import DAY_NAMES
 from app.db import async_session
 from app.formatting import format_homework, format_lessons
-from app.models import Homework, Lesson, ReminderLog
-from app.services import get_or_create_settings, get_or_create_student
+from app.models import Homework, Lesson, Recipient, ReminderLog
+from app.services import get_or_create_settings, get_recipients
 
 
 async def _already_sent(session, kind: str, ref_id: int | None, sent_date: dt.date) -> bool:
@@ -34,12 +34,17 @@ async def _log_sent(session, kind: str, ref_id: int | None, sent_date: dt.date) 
         await session.rollback()
 
 
+async def _broadcast(bot: Bot, recipients: list[Recipient], text: str) -> None:
+    for recipient in recipients:
+        await bot.send_message(recipient.telegram_chat_id, text)
+
+
 async def tick(bot: Bot) -> None:
     """Runs once a minute; checks whether any reminder is due right now."""
     async with async_session() as session:
         settings_row = await get_or_create_settings(session)
-        student = await get_or_create_student(session)
-        if not student.telegram_chat_id:
+        recipients = await get_recipients(session)
+        if not recipients:
             return
 
         tz = ZoneInfo(settings_row.timezone or "Europe/Moscow")
@@ -66,7 +71,7 @@ async def tick(bot: Bot) -> None:
                 text = f"Доброе утро! 📅 {DAY_NAMES[weekday]}, {today.strftime('%d.%m')}\n\n{format_lessons(lessons)}"
                 if hw:
                     text += f"\n\n📚 ДЗ на сегодня:\n{format_homework(hw)}"
-                await bot.send_message(student.telegram_chat_id, text)
+                await _broadcast(bot, recipients, text)
                 await _log_sent(session, "morning_digest", None, today)
 
         # --- Reminder before each lesson ---
@@ -86,7 +91,7 @@ async def tick(bot: Bot) -> None:
                         text += f" (каб. {lesson.room})"
                     if lesson.link:
                         text += f"\n🔗 {lesson.link}"
-                    await bot.send_message(student.telegram_chat_id, text)
+                    await _broadcast(bot, recipients, text)
                     await _log_sent(session, "lesson", lesson.id, today)
 
         # --- Homework reminders ---
@@ -96,10 +101,7 @@ async def tick(bot: Bot) -> None:
             )
             for hw in result.scalars().all():
                 if not await _already_sent(session, "homework_due", hw.id, today):
-                    await bot.send_message(
-                        student.telegram_chat_id,
-                        f"📌 Сегодня срок сдачи: {hw.subject} — {hw.description}",
-                    )
+                    await _broadcast(bot, recipients, f"📌 Сегодня срок сдачи: {hw.subject} — {hw.description}")
                     await _log_sent(session, "homework_due", hw.id, today)
 
             soon_date = today + dt.timedelta(days=settings_row.homework_reminder_days_before)
@@ -108,8 +110,9 @@ async def tick(bot: Bot) -> None:
             )
             for hw in result.scalars().all():
                 if not await _already_sent(session, "homework_due_soon", hw.id, today):
-                    await bot.send_message(
-                        student.telegram_chat_id,
+                    await _broadcast(
+                        bot,
+                        recipients,
                         f"📝 Скоро дедлайн ({soon_date.strftime('%d.%m')}): {hw.subject} — {hw.description}",
                     )
                     await _log_sent(session, "homework_due_soon", hw.id, today)
