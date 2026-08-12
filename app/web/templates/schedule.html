@@ -9,7 +9,7 @@
 
   {% for day in range(7) %}
     <section class="card">
-      <h2>{{ day_names[day] }}</h2>
+      <h2>{{ day_names[day] }}{% if day == today_weekday %} (СЕГОДНЯ){% endif %}</h2>
       {% if by_day[day] %}
         <table class="table">
           <thead>

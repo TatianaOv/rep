@@ -106,9 +106,9 @@ def create_app() -> FastAPI:
         by_day: dict[int, list[Lesson]] = {i: [] for i in range(7)}
         for lesson in lessons:
             by_day[lesson.day_of_week].append(lesson)
+        today = dt.date.today()
         current_week = None
         if settings_row.biweekly_enabled:
-            today = dt.date.today()
             anchor = settings_row.biweekly_anchor_date or today
             current_week = current_week_number(today, anchor)
         return templates.TemplateResponse(
@@ -117,6 +117,7 @@ def create_app() -> FastAPI:
             {
                 "by_day": by_day,
                 "day_names": DAY_NAMES,
+                "today_weekday": today.weekday(),
                 "biweekly_enabled": settings_row.biweekly_enabled,
                 "current_week": current_week,
             },

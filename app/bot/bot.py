@@ -120,7 +120,12 @@ async def cmd_week(message: Message) -> None:
             anchor = settings_row.biweekly_anchor_date or today
             header = f"(Неделя {current_week_number(today, anchor)})\n\n"
 
-        parts = [f"{DAY_NAMES[day]}:\n{format_lessons(by_day[day])}" for day in range(7) if day in by_day]
+        today_weekday = today.weekday()
+        parts = [
+            f"{DAY_NAMES[day]}{' (СЕГОДНЯ)' if day == today_weekday else ''}:\n{format_lessons(by_day[day])}"
+            for day in range(7)
+            if day in by_day
+        ]
         await message.answer(header + "\n\n".join(parts), parse_mode="HTML")
 
 
