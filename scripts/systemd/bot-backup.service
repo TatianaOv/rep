@@ -1,0 +1,8 @@
+[Unit]
+Description=Backup bot.db (Telegram scheduler bot)
+Wants=bot-backup.timer
+
+[Service]
+Type=oneshot
+# Adjust this path if you cloned the repo somewhere other than /root/bot
+ExecStart=/root/bot/scripts/backup_db.sh

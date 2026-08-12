@@ -106,3 +106,42 @@ run.py                 — точка входа: запускает бота, �
   добавлены в `.gitignore`.
 - К боту в Telegram может подключиться только тот, кто знает код привязки,
   который видите и генерируете только вы в веб-панели.
+
+## Автоматический бэкап базы данных
+
+Скрипт `scripts/backup_db.sh` делает безопасную «горячую» копию
+`data/bot.db` (через `sqlite3 .backup`, поэтому не повреждает файл, даже
+если бот в этот момент пишет в базу), сжимает её и хранит последние
+14 дней (настраивается через `KEEP_DAYS`), удаляя более старые копии.
+
+Настройка автозапуска на сервере (systemd-таймер, запуск раз в сутки в 03:30):
+
+```bash
+# sqlite3 CLI нужен на хосте (не в контейнере) — скрипт запускается снаружи
+apt install -y sqlite3
+
+# если склонировали репозиторий не в /root/bot — поправьте путь
+# в scripts/systemd/bot-backup.service (ExecStart)
+cp scripts/systemd/bot-backup.service /etc/systemd/system/
+cp scripts/systemd/bot-backup.timer /etc/systemd/system/
+
+systemctl daemon-reload
+systemctl enable --now bot-backup.timer
+```
+
+Проверить, что всё настроено и когда следующий запуск:
+```bash
+systemctl list-timers bot-backup.timer
+```
+
+Запустить бэкап вручную (не дожидаясь 03:30) и посмотреть лог:
+```bash
+systemctl start bot-backup.service
+journalctl -u bot-backup.service -n 20
+```
+
+Бэкапы лежат в `backups/` рядом с проектом. Это защищает от повреждения
+базы или случайного удаления, но не от полного отказа диска/сервера —
+для более надёжной защиты стоит время от времени копировать содержимое
+`backups/` куда-то ещё (на свой компьютер, в облако и т.п.), например
+`scp` или `rclone`.
