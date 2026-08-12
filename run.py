@@ -6,7 +6,7 @@ import logging
 import uvicorn
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-from app.bot.bot import create_bot_and_dispatcher
+from app.bot.bot import BOT_COMMANDS, create_bot_and_dispatcher
 from app.config import config
 from app.db import init_db
 from app.reminders import tick
@@ -22,6 +22,7 @@ async def main() -> None:
 
     await init_db()
     bot, dp = create_bot_and_dispatcher()
+    await bot.set_my_commands(BOT_COMMANDS)
 
     scheduler = AsyncIOScheduler()
     scheduler.add_job(tick, "interval", seconds=60, args=[bot])

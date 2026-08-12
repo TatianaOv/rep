@@ -6,7 +6,7 @@ import random
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, CommandStart
-from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
+from aiogram.types import BotCommand, CallbackQuery, InlineKeyboardMarkup, Message
 from sqlalchemy import select
 
 from app.config import config
@@ -21,6 +21,13 @@ from app.weeks import current_week_number, lesson_is_active_this_week
 router = Router()
 
 HELP_TEXT = "Команды:\n/today — расписание и ДЗ на сегодня\n/week — расписание на неделю\n/homework — список ДЗ"
+
+BOT_COMMANDS = [
+    BotCommand(command="today", description="Расписание и ДЗ на сегодня"),
+    BotCommand(command="week", description="Расписание на неделю"),
+    BotCommand(command="homework", description="Список домашних заданий"),
+    BotCommand(command="help", description="Список команд"),
+]
 
 CELEBRATIONS = [
     "Ты огонь! 🔥",
