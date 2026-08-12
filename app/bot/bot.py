@@ -348,7 +348,7 @@ async def handle_voice(message: Message) -> None:
         await message.answer(f"Не поняла 🙂\n\n{HELP_TEXT}")
         return
 
-    if not config.openai_api_key:
+    if not config.groq_api_key:
         await message.answer("Голосовые сообщения пока не настроены — напиши мне текстом 🙂")
         return
 

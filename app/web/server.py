@@ -311,7 +311,7 @@ def create_app() -> FastAPI:
                 "recipients": recipients,
                 "pending_codes": pending_codes,
                 "ai_api_key_configured": bool(config.anthropic_api_key),
-                "voice_api_key_configured": bool(config.openai_api_key),
+                "voice_api_key_configured": bool(config.groq_api_key),
             },
         )
 

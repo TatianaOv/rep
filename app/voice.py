@@ -10,14 +10,14 @@ _client: AsyncOpenAI | None = None
 def _get_client() -> AsyncOpenAI:
     global _client
     if _client is None:
-        _client = AsyncOpenAI(api_key=config.openai_api_key)
+        _client = AsyncOpenAI(api_key=config.groq_api_key, base_url="https://api.groq.com/openai/v1")
     return _client
 
 
 async def transcribe_voice(audio_bytes: bytes) -> str:
     client = _get_client()
     response = await client.audio.transcriptions.create(
-        model="whisper-1",
+        model="whisper-large-v3-turbo",
         file=("voice.ogg", audio_bytes),
         language="ru",
     )
