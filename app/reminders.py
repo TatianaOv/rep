@@ -16,6 +16,8 @@ from app.models import Homework, Lesson, Recipient, ReminderLog
 from app.services import get_or_create_lesson_ping, get_or_create_settings, get_recipients
 from app.weeks import lesson_is_active_this_week
 
+HEARTBEAT_TIME = "08:05"
+
 
 async def _already_sent(session, kind: str, ref_id: int | None, sent_date: dt.date) -> bool:
     result = await session.execute(
@@ -71,6 +73,14 @@ async def tick(bot: Bot) -> None:
         now = dt.datetime.now(tz)
         today = now.date()
         hhmm = now.strftime("%H:%M")
+
+        # --- Heartbeat: daily proof-of-life for whoever gets safety alerts,
+        # so a silent server/bot outage doesn't go unnoticed for days. ---
+        if hhmm == HEARTBEAT_TIME and not await _already_sent(session, "heartbeat", None, today):
+            admins = [r for r in recipients if r.notify_on_safety_concern]
+            if admins:
+                await _broadcast(bot, admins, "✅ Бот жив и работает — это ежедневная проверка на связь.")
+            await _log_sent(session, "heartbeat", None, today)
 
         # --- Morning digest ---
         if settings_row.morning_digest_enabled and settings_row.morning_digest_time.strftime("%H:%M") == hhmm:

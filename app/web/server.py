@@ -10,6 +10,12 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from starlette.middleware.sessions import SessionMiddleware
 
+from app.auth import (
+    clear_failed_attempts,
+    is_locked_out,
+    record_failed_attempt,
+    verify_password,
+)
 from app.config import config
 from app.constants import DAY_NAMES
 from app.db import async_session
@@ -45,9 +51,22 @@ def create_app() -> FastAPI:
 
     @app.post("/login")
     async def login_post(request: Request, username: str = Form(...), password: str = Form(...)):
-        if username == config.admin_username and password == config.admin_password:
+        client_ip = request.client.host if request.client else "unknown"
+
+        if is_locked_out(client_ip):
+            return templates.TemplateResponse(
+                request,
+                "login.html",
+                {"error": "Слишком много неудачных попыток входа. Попробуйте снова через 15 минут."},
+                status_code=429,
+            )
+
+        if username == config.admin_username and verify_password(password):
+            clear_failed_attempts(client_ip)
             request.session["authed"] = True
             return RedirectResponse("/", status_code=303)
+
+        record_failed_attempt(client_ip)
         return templates.TemplateResponse(
             request, "login.html", {"error": "Неверный логин или пароль"}, status_code=401
         )
