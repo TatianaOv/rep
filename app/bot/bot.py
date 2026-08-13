@@ -35,13 +35,16 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 HELP_TEXT = (
-    "Команды:\n/today — расписание и ДЗ на сегодня\n/week — расписание на неделю\n"
+    "Команды:\n/today — расписание и ДЗ на сегодня\n/tomorrow — расписание и ДЗ на завтра\n"
+    "/week — расписание на неделю\n/nextweek — расписание на следующую неделю\n"
     "/homework — список ДЗ\n/reset — начать разговор с ботом заново"
 )
 
 BOT_COMMANDS = [
     BotCommand(command="today", description="Расписание и ДЗ на сегодня"),
+    BotCommand(command="tomorrow", description="Расписание и ДЗ на завтра"),
     BotCommand(command="week", description="Расписание на неделю"),
+    BotCommand(command="nextweek", description="Расписание на следующую неделю"),
     BotCommand(command="homework", description="Список домашних заданий"),
     BotCommand(command="reset", description="Начать разговор с ботом заново"),
     BotCommand(command="help", description="Список команд"),
@@ -57,30 +60,46 @@ CELEBRATIONS = [
 ]
 
 
-async def _build_today(session, settings_row: PlannerSettings) -> tuple[str, InlineKeyboardMarkup | None]:
-    today = dt.date.today()
-    weekday = today.weekday()
+async def _build_day(
+    session, settings_row: PlannerSettings, target_date: dt.date, label: str
+) -> tuple[str, InlineKeyboardMarkup | None]:
+    weekday = target_date.weekday()
     result = await session.execute(
         select(Lesson).where(Lesson.day_of_week == weekday, Lesson.active.is_(True)).order_by(Lesson.start_time)
     )
-    lessons = [lesson for lesson in result.scalars().all() if lesson_is_active_this_week(lesson, settings_row, today)]
+    lessons = [
+        lesson for lesson in result.scalars().all() if lesson_is_active_this_week(lesson, settings_row, target_date)
+    ]
     result = await session.execute(
-        select(Homework).where(Homework.due_date == today, Homework.done.is_(False)).order_by(Homework.due_time)
+        select(Homework).where(Homework.due_date == target_date, Homework.done.is_(False)).order_by(Homework.due_time)
     )
     hw = result.scalars().all()
 
-    text = f"📅 {DAY_NAMES[weekday]}, {today.strftime('%d.%m')}\n\n{format_lessons(lessons)}"
+    text = f"📅 {DAY_NAMES[weekday]}, {target_date.strftime('%d.%m')}\n\n{format_lessons(lessons)}"
     if hw:
-        text += f"\n\n📚 ДЗ на сегодня:\n\n{format_homework(hw)}"
+        text += f"\n\n📚 ДЗ на {label}:\n\n{format_homework(hw)}"
     return text, homework_done_keyboard(hw)
 
 
-async def _build_week(session, settings_row: PlannerSettings) -> str:
-    today = dt.date.today()
+async def _build_today(session, settings_row: PlannerSettings) -> tuple[str, InlineKeyboardMarkup | None]:
+    return await _build_day(session, settings_row, dt.date.today(), "сегодня")
+
+
+async def _build_tomorrow(session, settings_row: PlannerSettings) -> tuple[str, InlineKeyboardMarkup | None]:
+    return await _build_day(session, settings_row, dt.date.today() + dt.timedelta(days=1), "завтра")
+
+
+async def _build_week_view(
+    session, settings_row: PlannerSettings, reference_date: dt.date, highlight_today: bool
+) -> str:
     result = await session.execute(
         select(Lesson).where(Lesson.active.is_(True)).order_by(Lesson.day_of_week, Lesson.start_time)
     )
-    lessons = [lesson for lesson in result.scalars().all() if lesson_is_active_this_week(lesson, settings_row, today)]
+    lessons = [
+        lesson
+        for lesson in result.scalars().all()
+        if lesson_is_active_this_week(lesson, settings_row, reference_date)
+    ]
     by_day: dict[int, list[Lesson]] = {}
     for lesson in lessons:
         by_day.setdefault(lesson.day_of_week, []).append(lesson)
@@ -90,16 +109,26 @@ async def _build_week(session, settings_row: PlannerSettings) -> str:
 
     header = ""
     if settings_row.biweekly_enabled:
-        anchor = settings_row.biweekly_anchor_date or today
-        header = f"(Неделя {current_week_number(today, anchor)})\n\n"
+        anchor = settings_row.biweekly_anchor_date or reference_date
+        header = f"(Неделя {current_week_number(reference_date, anchor)})\n\n"
 
-    today_weekday = today.weekday()
+    today_weekday = dt.date.today().weekday() if highlight_today else -1
     parts = [
         f"{DAY_NAMES[day]}{' (СЕГОДНЯ)' if day == today_weekday else ''}:\n{format_lessons(by_day[day])}"
         for day in range(7)
         if day in by_day
     ]
     return header + "\n\n".join(parts)
+
+
+async def _build_week(session, settings_row: PlannerSettings) -> str:
+    return await _build_week_view(session, settings_row, dt.date.today(), highlight_today=True)
+
+
+async def _build_next_week(session, settings_row: PlannerSettings) -> str:
+    next_week_date = dt.date.today() + dt.timedelta(days=7)
+    body = await _build_week_view(session, settings_row, next_week_date, highlight_today=False)
+    return f"📅 Следующая неделя:\n\n{body}"
 
 
 async def _build_homework(session) -> tuple[str, InlineKeyboardMarkup | None]:
@@ -153,6 +182,17 @@ async def cmd_today(message: Message) -> None:
     await message.answer(text, reply_markup=markup, parse_mode="HTML")
 
 
+@router.message(Command("tomorrow"))
+async def cmd_tomorrow(message: Message) -> None:
+    async with async_session() as session:
+        if not await find_recipient_by_chat_id(session, message.chat.id):
+            await message.answer("Бот не привязан к этому чату. Обратитесь к родителю.")
+            return
+        settings_row = await get_or_create_settings(session)
+        text, markup = await _build_tomorrow(session, settings_row)
+    await message.answer(text, reply_markup=markup, parse_mode="HTML")
+
+
 @router.message(Command("week"))
 async def cmd_week(message: Message) -> None:
     async with async_session() as session:
@@ -161,6 +201,17 @@ async def cmd_week(message: Message) -> None:
             return
         settings_row = await get_or_create_settings(session)
         text = await _build_week(session, settings_row)
+    await message.answer(text, parse_mode="HTML")
+
+
+@router.message(Command("nextweek"))
+async def cmd_next_week(message: Message) -> None:
+    async with async_session() as session:
+        if not await find_recipient_by_chat_id(session, message.chat.id):
+            await message.answer("Бот не привязан к этому чату. Обратитесь к родителю.")
+            return
+        settings_row = await get_or_create_settings(session)
+        text = await _build_next_week(session, settings_row)
     await message.answer(text, parse_mode="HTML")
 
 
