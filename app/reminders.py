@@ -50,8 +50,11 @@ async def _broadcast(
         await bot.send_message(recipient.telegram_chat_id, text, reply_markup=reply_markup, parse_mode=parse_mode)
 
 
-def _lesson_text(lesson: Lesson, minutes: int) -> str:
-    text = f"⏰ Через {minutes} мин: {lesson.subject}"
+def _lesson_text(lesson: Lesson, minutes_left: int) -> str:
+    if minutes_left <= 0:
+        text = f"⏰ Сейчас идёт: {lesson.subject}"
+    else:
+        text = f"⏰ Через {minutes_left} мин: {lesson.subject}"
     if lesson.teacher:
         text += f", {lesson.teacher}"
     if lesson.room:
@@ -149,10 +152,12 @@ async def tick(bot: Bot) -> None:
                     if elapsed_minutes < settings_row.lesson_reminder_repeat_minutes:
                         continue
 
+                lesson_start_dt = dt.datetime.combine(today, lesson.start_time, tzinfo=tz)
+                minutes_left = round((lesson_start_dt - now).total_seconds() / 60)
                 await _broadcast(
                     bot,
                     recipients,
-                    _lesson_text(lesson, settings_row.lesson_reminder_minutes),
+                    _lesson_text(lesson, minutes_left),
                     lesson_ack_keyboard(lesson.id),
                 )
                 ping.last_sent_at = now_naive
