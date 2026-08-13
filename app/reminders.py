@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import logging
 from zoneinfo import ZoneInfo
 
 from aiogram import Bot
@@ -15,6 +16,8 @@ from app.keyboards import homework_done_keyboard, lesson_ack_keyboard
 from app.models import Homework, Lesson, Recipient, ReminderLog
 from app.services import get_or_create_lesson_ping, get_or_create_settings, get_recipients
 from app.weeks import lesson_is_active_this_week
+
+logger = logging.getLogger(__name__)
 
 HEARTBEAT_TIME = "08:05"
 
@@ -47,7 +50,10 @@ async def _broadcast(
     parse_mode: str | None = None,
 ) -> None:
     for recipient in recipients:
-        await bot.send_message(recipient.telegram_chat_id, text, reply_markup=reply_markup, parse_mode=parse_mode)
+        try:
+            await bot.send_message(recipient.telegram_chat_id, text, reply_markup=reply_markup, parse_mode=parse_mode)
+        except Exception:
+            logger.exception("Failed to send reminder to recipient %s", recipient.telegram_chat_id)
 
 
 def _lesson_text(lesson: Lesson, minutes_left: int) -> str:
