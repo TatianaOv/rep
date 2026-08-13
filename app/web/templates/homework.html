@@ -17,10 +17,12 @@
             <td data-label="Готово">{{ 'да' if h.done else 'нет' }}</td>
             <td class="actions">
               <form method="post" action="/homework/{{ h.id }}/toggle_done">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <button type="submit">{{ 'Вернуть' if h.done else 'Готово' }}</button>
               </form>
               <a class="button-link" href="/homework?copy_from={{ h.id }}#add-homework">Копировать</a>
               <form method="post" action="/homework/{{ h.id }}/delete" onsubmit="return confirm('Удалить задание?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <button type="submit" class="danger">Удалить</button>
               </form>
             </td>
@@ -38,6 +40,7 @@
       <p class="muted">Скопировано из существующего задания — укажите новый срок сдачи и сохраните.</p>
     {% endif %}
     <form method="post" action="/homework/add" class="form-grid">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <label>Предмет <input type="text" name="subject" value="{{ copy_source.subject if copy_source else '' }}" required></label>
       <label>Срок сдачи <input type="date" name="due_date" required></label>
       <label>Время (необязательно) <input type="time" name="due_time" value="{{ copy_source.due_time.strftime('%H:%M') if copy_source and copy_source.due_time else '' }}"></label>

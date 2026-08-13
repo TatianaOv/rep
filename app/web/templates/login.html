@@ -9,6 +9,7 @@
 <body>
   <main class="login-wrap">
     <form class="card login-card" method="post" action="/login">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <h1>📚 Планировщик</h1>
       {% if error %}<p class="error">{{ error }}</p>{% endif %}
       <label>Логин

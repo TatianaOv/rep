@@ -7,3 +7,4 @@ restore_test/
 venv/
 .venv/
 *.db
+.pytest_cache/

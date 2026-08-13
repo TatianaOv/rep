@@ -15,11 +15,13 @@
       <a href="/homework">Домашние задания</a>
       <a href="/settings">Настройки</a>
       <form action="/logout" method="post" class="logout-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <button type="submit">Выйти</button>
       </form>
     </nav>
   </header>
   <main class="container">
+    {% if error %}<p class="error banner">{{ error }}</p>{% endif %}
     {% block content %}{% endblock %}
   </main>
 </body>

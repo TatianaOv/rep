@@ -120,6 +120,13 @@ button.danger:hover { background: #b91c1c; }
 .login-card label { display: flex; flex-direction: column; gap: 4px; font-size: 0.9rem; }
 
 .error { color: var(--danger); }
+.error.banner {
+  background: #fef2f2;
+  border: 1px solid var(--danger);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: 16px 0;
+}
 
 code {
   background: #f0f0f5;

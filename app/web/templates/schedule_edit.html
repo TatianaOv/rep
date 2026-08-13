@@ -5,6 +5,7 @@
 
   <section class="card">
     <form method="post" action="/schedule/{{ lesson.id }}/edit" class="form-grid">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <label>День недели
         <select name="day_of_week" required>
           {% for i in range(7) %}

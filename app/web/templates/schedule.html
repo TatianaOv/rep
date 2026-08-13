@@ -27,9 +27,11 @@
                 <td class="actions">
                   <a class="button-link" href="/schedule/{{ l.id }}/edit">Изменить</a>
                   <form method="post" action="/schedule/{{ l.id }}/copy">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <button type="submit">Копировать</button>
                   </form>
                   <form method="post" action="/schedule/{{ l.id }}/delete" onsubmit="return confirm('Удалить урок?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <button type="submit" class="danger">Удалить</button>
                   </form>
                 </td>
@@ -46,6 +48,7 @@
   <section class="card">
     <h2>Добавить урок</h2>
     <form method="post" action="/schedule/add" class="form-grid">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <label>День недели
         <select name="day_of_week" required>
           {% for i in range(7) %}<option value="{{ i }}">{{ day_names[i] }}</option>{% endfor %}

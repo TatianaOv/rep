@@ -18,16 +18,19 @@
               <td data-label="Подключён">{{ r.linked_at.strftime('%d.%m.%Y') }}</td>
               <td data-label="Увед. о ДЗ">
                 <form method="post" action="/settings/recipients/{{ r.id }}/toggle_notify">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                   <button type="submit">{{ '🔔 Вкл' if r.notify_on_homework_done else '🔕 Выкл' }}</button>
                 </form>
               </td>
               <td data-label="Увед. о тревоге">
                 <form method="post" action="/settings/recipients/{{ r.id }}/toggle_safety">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                   <button type="submit">{{ '🚨 Вкл' if r.notify_on_safety_concern else '🔕 Выкл' }}</button>
                 </form>
               </td>
               <td class="actions">
                 <form method="post" action="/settings/recipients/{{ r.id }}/delete" onsubmit="return confirm('Отключить этого получателя от напоминаний?');">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                   <button type="submit" class="danger">Отключить</button>
                 </form>
               </td>
@@ -47,6 +50,7 @@
           <li>
             <code>{{ c.code }}</code>{% if c.label %} — для «{{ c.label }}»{% endif %}
             <form method="post" action="/settings/link_codes/{{ c.id }}/delete" style="display:inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
               <button type="submit" class="danger">Отменить</button>
             </form>
           </li>
@@ -56,6 +60,7 @@
 
     <h2>Добавить получателя</h2>
     <form method="post" action="/settings/link_code" class="form-grid">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <label>Для кого (необязательно) <input type="text" name="label" placeholder="Мама, Бабушка..."></label>
       <button type="submit">Сгенерировать код привязки</button>
     </form>
@@ -65,6 +70,7 @@
   <section class="card">
     <h2>Напоминания</h2>
     <form method="post" action="/settings/update" class="form-grid">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <label>Имя дочери <input type="text" name="student_name" value="{{ student.name }}" required></label>
       <label>Часовой пояс <input type="text" name="timezone" value="{{ settings.timezone }}" placeholder="Europe/Moscow" required></label>
       <label class="checkbox">
