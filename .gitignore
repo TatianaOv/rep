@@ -3,6 +3,7 @@ __pycache__/
 .env
 data/
 backups/
+restore_test/
 venv/
 .venv/
 *.db
