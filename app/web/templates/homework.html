@@ -11,10 +11,10 @@
       <tbody>
         {% for h in items %}
           <tr class="{{ 'done' if h.done else '' }}">
-            <td>{{ h.due_date.strftime('%d.%m.%Y') }}{% if h.due_time %} {{ h.due_time.strftime('%H:%M') }}{% endif %}</td>
-            <td>{{ h.subject }}</td>
-            <td>{{ h.description }}</td>
-            <td>{{ 'да' if h.done else 'нет' }}</td>
+            <td data-label="Срок">{{ h.due_date.strftime('%d.%m.%Y') }}{% if h.due_time %} {{ h.due_time.strftime('%H:%M') }}{% endif %}</td>
+            <td data-label="Предмет">{{ h.subject }}</td>
+            <td data-label="Задание">{{ h.description }}</td>
+            <td data-label="Готово">{{ 'да' if h.done else 'нет' }}</td>
             <td class="actions">
               <form method="post" action="/homework/{{ h.id }}/toggle_done">
                 <button type="submit">{{ 'Вернуть' if h.done else 'Готово' }}</button>

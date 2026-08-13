@@ -13,20 +13,20 @@
         <tbody>
           {% for r in recipients %}
             <tr>
-              <td>{{ r.label or '—' }}</td>
-              <td>{{ '@' + r.telegram_username if r.telegram_username else '—' }}</td>
-              <td>{{ r.linked_at.strftime('%d.%m.%Y') }}</td>
-              <td>
+              <td data-label="Кто">{{ r.label or '—' }}</td>
+              <td data-label="Telegram">{{ '@' + r.telegram_username if r.telegram_username else '—' }}</td>
+              <td data-label="Подключён">{{ r.linked_at.strftime('%d.%m.%Y') }}</td>
+              <td data-label="Увед. о ДЗ">
                 <form method="post" action="/settings/recipients/{{ r.id }}/toggle_notify">
                   <button type="submit">{{ '🔔 Вкл' if r.notify_on_homework_done else '🔕 Выкл' }}</button>
                 </form>
               </td>
-              <td>
+              <td data-label="Увед. о тревоге">
                 <form method="post" action="/settings/recipients/{{ r.id }}/toggle_safety">
                   <button type="submit">{{ '🚨 Вкл' if r.notify_on_safety_concern else '🔕 Выкл' }}</button>
                 </form>
               </td>
-              <td>
+              <td class="actions">
                 <form method="post" action="/settings/recipients/{{ r.id }}/delete" onsubmit="return confirm('Отключить этого получателя от напоминаний?');">
                   <button type="submit" class="danger">Отключить</button>
                 </form>

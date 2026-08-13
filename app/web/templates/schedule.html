@@ -18,12 +18,12 @@
           <tbody>
             {% for l in by_day[day] %}
               <tr>
-                <td>{{ l.start_time.strftime('%H:%M') }}{% if l.end_time %}–{{ l.end_time.strftime('%H:%M') }}{% endif %}</td>
-                <td>{{ l.subject }}</td>
-                <td>{{ l.room or '' }}</td>
-                <td>{{ l.teacher or '' }}</td>
-                <td>{% if l.link %}<a href="{{ l.link }}" target="_blank" rel="noopener">Подключиться ↗</a>{% endif %}</td>
-                {% if biweekly_enabled %}<td>{{ 'Обе' if l.week == 0 else l.week }}</td>{% endif %}
+                <td data-label="Время">{{ l.start_time.strftime('%H:%M') }}{% if l.end_time %}–{{ l.end_time.strftime('%H:%M') }}{% endif %}</td>
+                <td data-label="Предмет">{{ l.subject }}</td>
+                <td data-label="Кабинет">{{ l.room or '' }}</td>
+                <td data-label="Учитель">{{ l.teacher or '' }}</td>
+                <td data-label="Ссылка">{% if l.link %}<a href="{{ l.link }}" target="_blank" rel="noopener">Подключиться ↗</a>{% endif %}</td>
+                {% if biweekly_enabled %}<td data-label="Неделя">{{ 'Обе' if l.week == 0 else l.week }}</td>{% endif %}
                 <td class="actions">
                   <a class="button-link" href="/schedule/{{ l.id }}/edit">Изменить</a>
                   <form method="post" action="/schedule/{{ l.id }}/copy">

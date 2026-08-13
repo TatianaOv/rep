@@ -126,3 +126,55 @@ code {
   padding: 2px 6px;
   border-radius: 4px;
 }
+
+/* ---------- Mobile layout ---------- */
+
+@media (max-width: 640px) {
+  .container { padding: 0 12px; }
+  .card { padding: 14px; }
+
+  .topbar { padding: 10px 14px; }
+  nav { gap: 10px 14px; width: 100%; }
+  nav a { font-size: 0.95rem; }
+
+  .form-grid { grid-template-columns: 1fr; }
+
+  /* Tables collapse into stacked cards: header row hides, each cell
+     becomes a labelled line via its data-label attribute. */
+  .table thead { display: none; }
+  .table, .table tbody, .table tr, .table td { display: block; width: 100%; }
+  .table tr {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 4px 12px;
+    margin-bottom: 12px;
+  }
+  .table td {
+    border-bottom: 1px solid var(--border);
+    padding: 8px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    text-align: right;
+  }
+  .table td:last-child { border-bottom: none; }
+  .table td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: var(--muted);
+    text-align: left;
+    flex: none;
+  }
+  .table td.actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .table td.actions::before { display: none; }
+  .table td.actions form,
+  .table td.actions .button-link { width: 100%; }
+  .table td.actions button,
+  .table td.actions .button-link { width: 100%; text-align: center; }
+
+  button, .button-link, input, select, textarea { font-size: 16px; }
+}
