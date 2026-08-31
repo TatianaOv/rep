@@ -9,7 +9,7 @@ from aiogram.types import InlineKeyboardMarkup
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from app.constants import DAY_NAMES
+from app.constants import DAY_NAMES, subject_marker
 from app.db import async_session
 from app.formatting import format_homework, format_lessons
 from app.keyboards import homework_done_keyboard, lesson_ack_keyboard
@@ -57,10 +57,11 @@ async def _broadcast(
 
 
 def _lesson_text(lesson: Lesson, minutes_left: int) -> str:
+    marker = subject_marker(lesson.subject)
     if minutes_left <= 0:
-        text = f"⏰ Сейчас идёт: {lesson.subject}"
+        text = f"⏰ Сейчас идёт: {marker}{lesson.subject}"
     else:
-        text = f"⏰ Через {minutes_left} мин: {lesson.subject}"
+        text = f"⏰ Через {minutes_left} мин: {marker}{lesson.subject}"
     if lesson.teacher:
         text += f", {lesson.teacher}"
     if lesson.room:
