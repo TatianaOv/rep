@@ -20,6 +20,22 @@ def test_history_and_pe_intentionally_share_red():
     assert subject_marker("Физкультура") == "🔴 "
 
 
+def test_serbian_cyrillic_and_latin_variants_match_the_same_color():
+    # Cyrillic
+    assert subject_marker("Немачки језик") == "💚 "
+    assert subject_marker("Историја") == "🔴 "
+    # Latin, with diacritics
+    assert subject_marker("Nemački jezik") == "💚 "
+    assert subject_marker("Fizičko vaspitanje") == "🔴 "
+    # Latin, typed without diacritics (very common in practice)
+    assert subject_marker("Nemacki jezik") == "💚 "
+    assert subject_marker("Fizicko") == "🔴 "
+    assert subject_marker("Geografija") == "🔵 "
+    # Short abbreviation some Serbian schools use
+    assert subject_marker("ТИО") == "🩷 "
+    assert subject_marker("tio") == "🩷 "
+
+
 def test_format_lessons_includes_subject_marker():
     lesson = Lesson(subject="Химия", start_time=dt.time(10, 0))
     text = format_lessons([lesson])
