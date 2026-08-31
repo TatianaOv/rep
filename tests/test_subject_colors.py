@@ -6,8 +6,8 @@ from app.models import Homework, Lesson
 
 
 def test_known_subject_gets_a_marker():
-    assert subject_marker("Математика") == "🟢 "
-    assert subject_marker("математика") == "🟢 "  # case-insensitive
+    assert subject_marker("Математика") == "x² "
+    assert subject_marker("математика") == "x² "  # case-insensitive
     assert subject_marker("  Физика  ") == "🟠 "  # tolerates whitespace
 
 
@@ -15,25 +15,37 @@ def test_unknown_subject_gets_no_marker():
     assert subject_marker("Рисование") == ""
 
 
-def test_history_and_pe_intentionally_share_red():
-    assert subject_marker("История") == "🔴 "
-    assert subject_marker("Физкультура") == "🔴 "
+def test_history_and_pe_have_their_own_thematic_markers():
+    assert subject_marker("История") == "🏛️ "
+    assert subject_marker("Физкультура") == "🏐 "
 
 
-def test_serbian_cyrillic_and_latin_variants_match_the_same_color():
+def test_serbian_cyrillic_and_latin_variants_match_the_same_marker():
     # Cyrillic
     assert subject_marker("Немачки језик") == "💚 "
-    assert subject_marker("Историја") == "🔴 "
+    assert subject_marker("Историја") == "🏛️ "
     # Latin, with diacritics
     assert subject_marker("Nemački jezik") == "💚 "
-    assert subject_marker("Fizičko vaspitanje") == "🔴 "
+    assert subject_marker("Fizičko vaspitanje") == "🏐 "
     # Latin, typed without diacritics (very common in practice)
     assert subject_marker("Nemacki jezik") == "💚 "
-    assert subject_marker("Fizicko") == "🔴 "
+    assert subject_marker("Fizicko") == "🏐 "
     assert subject_marker("Geografija") == "🔵 "
     # Short abbreviation some Serbian schools use
     assert subject_marker("ТИО") == "🩷 "
     assert subject_marker("tio") == "🩷 "
+
+
+def test_exact_school_subject_names_from_the_real_schedule():
+    # These are the exact (ALL CAPS Latin) subject names as they appear in
+    # the actual schedule, which previously matched nothing.
+    assert subject_marker("SRPSKI JEZIK I KNJIŽEVNOST") == "📖 "
+    assert subject_marker("MUZIČKA KULTURA") == "🎼 "
+    assert subject_marker("FIZIČKO I ZDRAVSTVENO VASPITANJE") == "🏐 "
+    assert subject_marker("BIOLOGIJA") == "🍃 "
+    assert subject_marker("ISTORIJA") == "🏛️ "
+    assert subject_marker("MATEMATIKA") == "x² "
+    assert subject_marker("INFORMATIKA I RAČUNARSTVO") == "💻 "
 
 
 def test_format_lessons_includes_subject_marker():
