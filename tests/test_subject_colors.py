@@ -6,8 +6,8 @@ from app.models import Homework, Lesson
 
 
 def test_known_subject_gets_a_marker():
-    assert subject_marker("Математика") == "x² "
-    assert subject_marker("математика") == "x² "  # case-insensitive
+    assert subject_marker("Математика") == "🧮 "
+    assert subject_marker("математика") == "🧮 "  # case-insensitive
     assert subject_marker("  Физика  ") == "🟠 "  # tolerates whitespace
 
 
@@ -44,7 +44,7 @@ def test_exact_school_subject_names_from_the_real_schedule():
     assert subject_marker("FIZIČKO I ZDRAVSTVENO VASPITANJE") == "🏐 "
     assert subject_marker("BIOLOGIJA") == "🍃 "
     assert subject_marker("ISTORIJA") == "🏛️ "
-    assert subject_marker("MATEMATIKA") == "x² "
+    assert subject_marker("MATEMATIKA") == "🧮 "
     assert subject_marker("INFORMATIKA I RAČUNARSTVO") == "💻 "
 
 
