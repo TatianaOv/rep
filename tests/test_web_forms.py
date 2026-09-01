@@ -46,6 +46,55 @@ def test_valid_lesson_can_be_added(client):
     assert "Настоящий урок" in client.get("/schedule").text
 
 
+def test_school_source_is_saved_and_marked_in_the_table(client):
+    r = client.get("/schedule")
+    token = _csrf_token(r.text)
+    r = client.post(
+        "/schedule/add",
+        data={
+            "csrf_token": token,
+            "day_of_week": "1",
+            "start_time": "08:00",
+            "end_time": "",
+            "subject": "MATEMATIKA",
+            "room": "",
+            "teacher": "",
+            "link": "",
+            "week": "0",
+            "source": "школа",
+        },
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    page = client.get("/schedule").text
+    assert "MATEMATIKA 🏫" in page
+
+
+def test_arbitrary_source_value_is_not_stored_verbatim(client):
+    r = client.get("/schedule")
+    token = _csrf_token(r.text)
+    r = client.post(
+        "/schedule/add",
+        data={
+            "csrf_token": token,
+            "day_of_week": "2",
+            "start_time": "08:00",
+            "end_time": "",
+            "subject": "Подделанный урок",
+            "room": "",
+            "teacher": "",
+            "link": "",
+            "week": "0",
+            "source": "something-else",
+        },
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    page = client.get("/schedule").text
+    assert "Подделанный урок 🏫" not in page
+    assert "Подделанный урок" in page
+
+
 def test_invalid_time_shows_friendly_error_instead_of_crashing(client):
     r = client.get("/schedule")
     token = _csrf_token(r.text)

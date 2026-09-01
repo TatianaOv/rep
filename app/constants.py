@@ -10,6 +10,11 @@ DAY_NAMES = [
     "Воскресенье",
 ]
 
+# Lesson.source sentinel: school lessons follow the school's own bell
+# schedule, so the "starts in N min" push reminder is skipped for them
+# (the lesson still shows up normally in /today, /week, the digest, etc).
+SCHOOL_SOURCE = "школа"
+
 
 def _normalize_subject(text: str) -> str:
     """Lowercase and strip Latin diacritics, so "Nemački"/"Nemacki"/"немачки"

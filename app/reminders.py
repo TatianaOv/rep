@@ -9,7 +9,7 @@ from aiogram.types import InlineKeyboardMarkup
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from app.constants import DAY_NAMES, subject_marker
+from app.constants import DAY_NAMES, SCHOOL_SOURCE, subject_marker
 from app.db import async_session
 from app.formatting import format_homework, format_lessons
 from app.keyboards import homework_done_keyboard, lesson_ack_keyboard
@@ -54,6 +54,12 @@ async def _broadcast(
             await bot.send_message(recipient.telegram_chat_id, text, reply_markup=reply_markup, parse_mode=parse_mode)
         except Exception:
             logger.exception("Failed to send reminder to recipient %s", recipient.telegram_chat_id)
+
+
+def _lesson_needs_start_reminder(lesson: Lesson) -> bool:
+    """School lessons follow the school's own bell schedule — the child is
+    already there, so a "starts in N min" push would just be noise."""
+    return lesson.source != SCHOOL_SOURCE
 
 
 def _lesson_text(lesson: Lesson, minutes_left: int) -> str:
@@ -125,6 +131,8 @@ async def tick(bot: Bot) -> None:
             )
             for lesson in result.scalars().all():
                 if not lesson_is_active_this_week(lesson, settings_row, today):
+                    continue
+                if not _lesson_needs_start_reminder(lesson):
                     continue
                 reminder_dt = dt.datetime.combine(today, lesson.start_time, tzinfo=tz) - dt.timedelta(
                     minutes=settings_row.lesson_reminder_minutes

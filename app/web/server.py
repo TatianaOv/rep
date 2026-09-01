@@ -18,7 +18,7 @@ from app.auth import (
     verify_password,
 )
 from app.config import config
-from app.constants import DAY_NAMES
+from app.constants import DAY_NAMES, SCHOOL_SOURCE
 from app.db import async_session
 from app.models import Homework, LinkCode, Lesson, Recipient
 from app.services import (
@@ -191,6 +191,7 @@ def create_app() -> FastAPI:
         teacher: str = Form(""),
         link: str = Form(""),
         week: int = Form(0),
+        source: str = Form(""),
     ):
         redirect = redirect_if_unauthed(request)
         if redirect:
@@ -214,6 +215,7 @@ def create_app() -> FastAPI:
                 teacher=teacher.strip() or None,
                 link=link.strip() or None,
                 week=week,
+                source=source if source == SCHOOL_SOURCE else "",
             )
             session.add(lesson)
             await session.commit()
@@ -243,6 +245,7 @@ def create_app() -> FastAPI:
         teacher: str = Form(""),
         link: str = Form(""),
         week: int = Form(0),
+        source: str = Form(""),
     ):
         redirect = redirect_if_unauthed(request)
         if redirect:
@@ -267,6 +270,7 @@ def create_app() -> FastAPI:
                 lesson.teacher = teacher.strip() or None
                 lesson.link = link.strip() or None
                 lesson.week = week
+                lesson.source = source if source == SCHOOL_SOURCE else ""
                 await session.commit()
         return RedirectResponse("/schedule", status_code=303)
 
@@ -306,6 +310,7 @@ def create_app() -> FastAPI:
                     link=lesson.link,
                     week=lesson.week,
                     active=lesson.active,
+                    source=lesson.source,
                 )
                 session.add(copy)
                 await session.commit()

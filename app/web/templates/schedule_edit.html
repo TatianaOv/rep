@@ -26,6 +26,12 @@
           <option value="2" {% if lesson.week == 2 %}selected{% endif %}>Неделя 2</option>
         </select>
       </label>
+      <label>Источник расписания
+        <select name="source">
+          <option value="" {% if lesson.source != 'школа' %}selected{% endif %}>Обычный (напоминание о начале — как обычно)</option>
+          <option value="школа" {% if lesson.source == 'школа' %}selected{% endif %}>Школа (без напоминания о начале урока)</option>
+        </select>
+      </label>
       <button type="submit">Сохранить</button>
       <a class="button-link" href="/schedule">Отмена</a>
     </form>

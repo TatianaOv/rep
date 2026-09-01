@@ -46,6 +46,8 @@ async def _add_missing_columns(conn) -> None:
         await conn.execute(text("ALTER TABLE lessons ADD COLUMN link VARCHAR(500)"))
     if "week" not in columns:
         await conn.execute(text("ALTER TABLE lessons ADD COLUMN week INTEGER DEFAULT 0"))
+    if "source" not in columns:
+        await conn.execute(text("ALTER TABLE lessons ADD COLUMN source VARCHAR(20) DEFAULT ''"))
 
     result = await conn.execute(text("PRAGMA table_info(recipients)"))
     recipient_columns = {row[1] for row in result.fetchall()}

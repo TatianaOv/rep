@@ -19,7 +19,7 @@
             {% for l in by_day[day] %}
               <tr>
                 <td data-label="Время">{{ l.start_time.strftime('%H:%M') }}{% if l.end_time %}–{{ l.end_time.strftime('%H:%M') }}{% endif %}</td>
-                <td data-label="Предмет">{{ l.subject }}</td>
+                <td data-label="Предмет">{{ l.subject }}{% if l.source == 'школа' %} 🏫{% endif %}</td>
                 <td data-label="Кабинет">{{ l.room or '' }}</td>
                 <td data-label="Учитель">{{ l.teacher or '' }}</td>
                 <td data-label="Ссылка">{% if l.link %}<a href="{{ l.link }}" target="_blank" rel="noopener">Подключиться ↗</a>{% endif %}</td>
@@ -65,6 +65,12 @@
           <option value="0">Обе недели</option>
           <option value="1">Неделя 1</option>
           <option value="2">Неделя 2</option>
+        </select>
+      </label>
+      <label>Источник расписания
+        <select name="source">
+          <option value="">Обычный (напоминание о начале — как обычно)</option>
+          <option value="школа">Школа (без напоминания о начале урока)</option>
         </select>
       </label>
       <button type="submit">Добавить</button>

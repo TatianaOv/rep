@@ -3,7 +3,16 @@ import logging
 import pytest
 
 from app.models import Lesson, Recipient
-from app.reminders import _broadcast, _lesson_text
+from app.reminders import _broadcast, _lesson_needs_start_reminder, _lesson_text
+
+
+def test_school_lesson_does_not_need_a_start_reminder():
+    assert _lesson_needs_start_reminder(Lesson(source="школа")) is False
+
+
+def test_non_school_lesson_still_gets_a_start_reminder():
+    assert _lesson_needs_start_reminder(Lesson(source="")) is True
+    assert _lesson_needs_start_reminder(Lesson()) is True  # source unset -> normal behaviour
 
 
 def test_lesson_text_shows_minutes_remaining():

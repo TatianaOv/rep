@@ -53,6 +53,9 @@ class Lesson(Base):
     link: Mapped[str | None] = mapped_column(String(500), nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     week: Mapped[int] = mapped_column(Integer, default=0)  # 0 = every week, 1 = week 1 only, 2 = week 2 only
+    # "" (default) = обычный урок, напоминания перед началом работают как всегда.
+    # "школа" = ребёнок и так на месте по звонку школы — напоминание о начале не шлём.
+    source: Mapped[str] = mapped_column(String(20), default="")
 
 
 class Homework(Base):
