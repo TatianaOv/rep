@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}Настройки — Планировщик{% endblock %}
+{% block content %}
+  <h1>Настройки</h1>
+
+  <section class="card">
+    <h2>Кто получает напоминания</h2>
+    {% if recipients %}
+      <table class="table">
+        <thead>
+          <tr><th>Кто</th><th>Telegram</th><th>Подключён</th><th>Увед. о ДЗ</th><th>Увед. о тревоге</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for r in recipients %}
+            <tr>
+              <td data-label="Кто">{{ r.label or '—' }}</td>
+              <td data-label="Telegram">{{ '@' + r.telegram_username if r.telegram_username else '—' }}</td>
+              <td data-label="Подключён">{{ r.linked_at.strftime('%d.%m.%Y') }}</td>
+              <td data-label="Увед. о ДЗ">
+                <form method="post" action="/settings/recipients/{{ r.id }}/toggle_notify">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <button type="submit">{{ '🔔 Вкл' if r.notify_on_homework_done else '🔕 Выкл' }}</button>
+                </form>
+              </td>
+              <td data-label="Увед. о тревоге">
+                <form method="post" action="/settings/recipients/{{ r.id }}/toggle_safety">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <button type="submit">{{ '🚨 Вкл' if r.notify_on_safety_concern else '🔕 Выкл' }}</button>
+                </form>
+              </td>
+              <td class="actions">
+                <form method="post" action="/settings/recipients/{{ r.id }}/delete" onsubmit="return confirm('Отключить этого получателя от напоминаний?');">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <button type="submit" class="danger">Отключить</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <p class="muted">«Увед. о ДЗ» — этот получатель будет узнавать, когда кто-то другой отмечает домашку выполненной. «Увед. о тревоге» — этот получатель получит сигнал, если ИИ-собеседник заметит признаки реальной опасности в разговоре (см. ниже).</p>
+    {% else %}
+      <p class="muted">Пока никто не подключён.</p>
+    {% endif %}
+
+    {% if pending_codes %}
+      <h2>Коды, ожидающие активации</h2>
+      <ul class="list">
+        {% for c in pending_codes %}
+          <li>
+            <code>{{ c.code }}</code>{% if c.label %} — для «{{ c.label }}»{% endif %}
+            <form method="post" action="/settings/link_codes/{{ c.id }}/delete" style="display:inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button type="submit" class="danger">Отменить</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+
+    <h2>Добавить получателя</h2>
+    <form method="post" action="/settings/link_code" class="form-grid">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>Для кого (необязательно) <input type="text" name="label" placeholder="Мама, Бабушка..."></label>
+      <button type="submit">Сгенерировать код привязки</button>
+    </form>
+    <p class="muted">Дайте получателю код — он открывает бота в Telegram и отправляет команду <code>/start КОД</code></p>
+  </section>
+
+  <section class="card">
+    <h2>Напоминания</h2>
+    <form method="post" action="/settings/update" class="form-grid">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>Имя дочери <input type="text" name="student_name" value="{{ student.name }}" required></label>
+      <label>Часовой пояс <input type="text" name="timezone" value="{{ settings.timezone }}" placeholder="Europe/Moscow" required></label>
+      <label class="checkbox">
+        <input type="checkbox" name="morning_digest_enabled" {% if settings.morning_digest_enabled %}checked{% endif %}>
+        Утренняя сводка
+      </label>
+      <label>Время утренней сводки <input type="time" name="morning_digest_time" value="{{ settings.morning_digest_time.strftime('%H:%M') }}" required></label>
+      <label>Напоминание перед уроком, мин (пусто — выключить)
+        <input type="number" name="lesson_reminder_minutes" min="0" value="{{ settings.lesson_reminder_minutes if settings.lesson_reminder_minutes is not none else '' }}">
+      </label>
+      <label class="checkbox">
+        <input type="checkbox" name="lesson_reminder_repeat_enabled" {% if settings.lesson_reminder_repeat_enabled %}checked{% endif %}>
+        Повторять напоминание об уроке, пока не отметят «Урок пройден»
+      </label>
+      <label>Интервал повтора, мин
+        <input type="number" name="lesson_reminder_repeat_minutes" min="1" value="{{ settings.lesson_reminder_repeat_minutes }}">
+      </label>
+      <label>Время напоминаний о ДЗ <input type="time" name="homework_reminder_time" value="{{ settings.homework_reminder_time.strftime('%H:%M') }}" required></label>
+      <label>За сколько дней напоминать заранее
+        <input type="number" name="homework_reminder_days_before" min="0" value="{{ settings.homework_reminder_days_before }}" required>
+      </label>
+      <label class="checkbox">
+        <input type="checkbox" name="biweekly_enabled" {% if settings.biweekly_enabled %}checked{% endif %}>
+        Расписание чередуется по неделям (Неделя 1 / Неделя 2)
+      </label>
+      <label>Начало Недели 1 (любой понедельник)
+        <input type="date" name="biweekly_anchor_date" value="{{ settings.biweekly_anchor_date.isoformat() if settings.biweekly_anchor_date else '' }}">
+      </label>
+      <label class="checkbox">
+        <input type="checkbox" name="ai_companion_enabled" {% if settings.ai_companion_enabled %}checked{% endif %} {% if not ai_api_key_configured %}disabled{% endif %}>
+        ИИ-собеседник (можно просто написать боту, не только команды)
+      </label>
+      <button type="submit">Сохранить</button>
+    </form>
+    <p class="muted">Если включено — в расписании у каждого урока можно указать, на какой неделе он проходит. Бот сам определит, какая неделя сейчас идёт, и будет присылать напоминания только по актуальному расписанию.</p>
+    <p class="muted">«Повторять напоминание об уроке» — если включено, под напоминанием появится кнопка «✅ Урок пройден». Пока никто из получателей её не нажмёт, бот будет присылать напоминание повторно с указанным интервалом (перестаёт сам, когда урок заканчивается по расписанию).</p>
+  </section>
+
+  <section class="card">
+    <h2>ИИ-собеседник</h2>
+    {% if ai_api_key_configured %}
+      <p class="muted">Ключ Anthropic API настроен ✅. Включите галочку выше, чтобы бот отвечал на обычные сообщения (не только команды).</p>
+    {% else %}
+      <p class="muted">Чтобы включить, укажите <code>ANTHROPIC_API_KEY</code> в файле <code>.env</code> и перезапустите бота — тогда галочка выше станет доступна.</p>
+    {% endif %}
+    {% if voice_api_key_configured %}
+      <p class="muted">Ключ Groq API для голосовых настроен ✅ — бот распознаёт голосовые сообщения и отвечает текстом.</p>
+    {% else %}
+      <p class="muted">Голосовые сообщения пока не распознаются — чтобы включить, добавьте ещё и <code>GROQ_API_KEY</code> в <code>.env</code> (бесплатный сервис распознавания речи Groq, Anthropic сам аудио не принимает).</p>
+    {% endif %}
+    <p class="muted">
+      Разговор с ИИ-собеседником <strong>полностью приватный</strong> — он нигде не отображается в этой панели.
+      Единственное исключение: если бот заметит реальные признаки опасности (мысли о самоповреждении, насилие,
+      угроза безопасности), получателям с включённым «Увед. о тревоге» придёт короткий сигнал с сутью проблемы.
+      Обычные жалобы на школу, усталость, ссоры с друзьями — это не повод для сигнала, всё остаётся приватным.
+    </p>
+    <p class="muted">
+      Учтите: сама переписка технически хранится в базе данных бота на этом компьютере (файл <code>data/bot.db</code>).
+      Она нигде не показывается в интерфейсе, но не является зашифрованной.
+    </p>
+  </section>
+{% endblock %}

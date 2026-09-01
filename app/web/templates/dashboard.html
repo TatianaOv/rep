@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Дашборд — Планировщик{% endblock %}
+{% block content %}
+  <h1>Привет!</h1>
+  <p class="muted">
+    {% if recipients %}
+      Бот подключён, получателей напоминаний: {{ recipients|length }} ✅
+    {% else %}
+      Бот ещё ни к кому не подключён. Зайди в <a href="/settings">Настройки</a> и сгенерируй код привязки.
+    {% endif %}
+  </p>
+
+  <section class="card">
+    <h2>Сегодня: {{ today_name }}</h2>
+    {% if today_lessons %}
+      <ul class="list">
+        {% for l in today_lessons %}
+          <li>{{ l.start_time.strftime('%H:%M') }} — {{ l.subject }}{% if l.room %} (каб. {{ l.room }}){% endif %}</li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="muted">Уроков нет.</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2>Ближайшие домашние задания</h2>
+    {% if upcoming_hw %}
+      <ul class="list">
+        {% for h in upcoming_hw %}
+          <li><strong>{{ h.due_date.strftime('%d.%m') }}</strong> — {{ h.subject }}: {{ h.description }}</li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="muted">Нет невыполненных заданий.</p>
+    {% endif %}
+  </section>
+{% endblock %}

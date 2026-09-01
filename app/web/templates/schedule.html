@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Расписание — Планировщик{% endblock %}
+{% block content %}
+  <h1>Расписание уроков</h1>
+
+  {% if biweekly_enabled %}
+    <p class="muted">Расписание чередуется по неделям. Сейчас идёт: <strong>Неделя {{ current_week }}</strong></p>
+  {% endif %}
+
+  {% for day in range(7) %}
+    <section class="card">
+      <h2>{{ day_names[day] }}{% if day == today_weekday %} (СЕГОДНЯ){% endif %}</h2>
+      {% if by_day[day] %}
+        <table class="table">
+          <thead>
+            <tr><th>Время</th><th>Предмет</th><th>Кабинет</th><th>Учитель</th><th>Ссылка</th>{% if biweekly_enabled %}<th>Неделя</th>{% endif %}<th></th></tr>
+          </thead>
+          <tbody>
+            {% for l in by_day[day] %}
+              <tr>
+                <td data-label="Время">{{ l.start_time.strftime('%H:%M') }}{% if l.end_time %}–{{ l.end_time.strftime('%H:%M') }}{% endif %}</td>
+                <td data-label="Предмет">{{ l.subject }}{% if l.source == 'школа' %} 🏫{% endif %}</td>
+                <td data-label="Кабинет">{{ l.room or '' }}</td>
+                <td data-label="Учитель">{{ l.teacher or '' }}</td>
+                <td data-label="Ссылка">{% if l.link %}<a href="{{ l.link }}" target="_blank" rel="noopener">Подключиться ↗</a>{% endif %}</td>
+                {% if biweekly_enabled %}<td data-label="Неделя">{{ 'Обе' if l.week == 0 else l.week }}</td>{% endif %}
+                <td class="actions">
+                  <a class="button-link" href="/schedule/{{ l.id }}/edit">Изменить</a>
+                  <form method="post" action="/schedule/{{ l.id }}/copy">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button type="submit">Копировать</button>
+                  </form>
+                  <form method="post" action="/schedule/{{ l.id }}/delete" onsubmit="return confirm('Удалить урок?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button type="submit" class="danger">Удалить</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p class="muted">Уроков нет.</p>
+      {% endif %}
+    </section>
+  {% endfor %}
+
+  <section class="card">
+    <h2>Добавить урок</h2>
+    <form method="post" action="/schedule/add" class="form-grid">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>День недели
+        <select name="day_of_week" required>
+          {% for i in range(7) %}<option value="{{ i }}">{{ day_names[i] }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Начало <input type="time" name="start_time" required></label>
+      <label>Конец <input type="time" name="end_time"></label>
+      <label>Предмет <input type="text" name="subject" required></label>
+      <label>Кабинет <input type="text" name="room"></label>
+      <label>Учитель <input type="text" name="teacher"></label>
+      <label>Ссылка на созвон <input type="url" name="link" placeholder="https://zoom.us/..."></label>
+      <label>Неделя
+        <select name="week">
+          <option value="0">Обе недели</option>
+          <option value="1">Неделя 1</option>
+          <option value="2">Неделя 2</option>
+        </select>
+      </label>
+      <label>Источник расписания
+        <select name="source">
+          <option value="">Обычный (напоминание о начале — как обычно)</option>
+          <option value="школа">Школа (без напоминания о начале урока)</option>
+        </select>
+      </label>
+      <button type="submit">Добавить</button>
+    </form>
+  </section>
+{% endblock %}

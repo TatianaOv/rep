@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Изменить урок — Планировщик{% endblock %}
+{% block content %}
+  <h1>Изменить урок</h1>
+
+  <section class="card">
+    <form method="post" action="/schedule/{{ lesson.id }}/edit" class="form-grid">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>День недели
+        <select name="day_of_week" required>
+          {% for i in range(7) %}
+            <option value="{{ i }}" {% if i == lesson.day_of_week %}selected{% endif %}>{{ day_names[i] }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Начало <input type="time" name="start_time" value="{{ lesson.start_time.strftime('%H:%M') }}" required></label>
+      <label>Конец <input type="time" name="end_time" value="{{ lesson.end_time.strftime('%H:%M') if lesson.end_time else '' }}"></label>
+      <label>Предмет <input type="text" name="subject" value="{{ lesson.subject }}" required></label>
+      <label>Кабинет <input type="text" name="room" value="{{ lesson.room or '' }}"></label>
+      <label>Учитель <input type="text" name="teacher" value="{{ lesson.teacher or '' }}"></label>
+      <label>Ссылка на созвон <input type="url" name="link" value="{{ lesson.link or '' }}" placeholder="https://zoom.us/..."></label>
+      <label>Неделя
+        <select name="week">
+          <option value="0" {% if lesson.week == 0 %}selected{% endif %}>Обе недели</option>
+          <option value="1" {% if lesson.week == 1 %}selected{% endif %}>Неделя 1</option>
+          <option value="2" {% if lesson.week == 2 %}selected{% endif %}>Неделя 2</option>
+        </select>
+      </label>
+      <label>Источник расписания
+        <select name="source">
+          <option value="" {% if lesson.source != 'школа' %}selected{% endif %}>Обычный (напоминание о начале — как обычно)</option>
+          <option value="школа" {% if lesson.source == 'школа' %}selected{% endif %}>Школа (без напоминания о начале урока)</option>
+        </select>
+      </label>
+      <button type="submit">Сохранить</button>
+      <a class="button-link" href="/schedule">Отмена</a>
+    </form>
+  </section>
+{% endblock %}

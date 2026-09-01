@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily backup of bot.db
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+# If the server was off at 03:30, run the missed backup as soon as it's back up
+Persistent=true
+
+[Install]
+WantedBy=timers.target
